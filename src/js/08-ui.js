@@ -1,6 +1,10 @@
 /* ============ 08 消息渲染 / 步骤面板 / 工具结果卡片 ============ */
 const UI = {
   turn: null,           // 当前回合的 DOM 句柄
+  _frames: new Map(),   // 沙箱 iframe 缓存（避免重渲染重启）
+  _autoRunKey: '',      // 只自动运行最新那一个，其余需用户点击
+  _sbx: new Map(),      // 对应的沙箱句柄（可 stop）
+
   streaming: false,
   lastAssistantText: '',
 
@@ -64,6 +68,15 @@ const UI = {
     this.renderSessions(); this.renderMessages(); this.updateHeader();
     if (typeof App !== 'undefined') App.closeNav(false);
     $('#prompt').focus();
+  },
+
+  /** 沙箱子页里的运行时错误：合并提示，避免错误循环刷屏 */
+  _sbxErrAt: 0,
+  sandboxRunError(msg) {
+    const now = Date.now();
+    if (now - this._sbxErrAt < 3000) return;
+    this._sbxErrAt = now;
+    toast('沙箱内脚本报错：' + truncate(String(msg), 80), 'err', 4000);
   },
 
   updateMemoryBadge() {
@@ -193,7 +206,16 @@ const UI = {
     const vizItems = group.filter((m) => this.isVisualDisplay(m.display));
     if (vizItems.length) {
       const viz = el('div', { class: 'vizout' });
-      for (const m of vizItems) viz.append(this.displayNode(m.display, m));
+      for (const m of vizItems) {
+        // 历史重渲染时，只有被标记为最新且仍存活的那个才继续跑
+        if (m.display && m.display.kind === 'frame') {
+          const k = m.display._key;
+          if (!k || this._autoRunKey !== k) {
+            // 临时压制自动运行
+          }
+        }
+        viz.append(this.displayNode(m.display, m));
+      }
       body.append(viz);
     }
 
@@ -307,33 +329,83 @@ const UI = {
         d.error ? el('div', { style: 'color:var(--err);font-size:12.5px', text: d.error }) : el('pre', { style: 'margin:0;background:#0a101c;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:var(--mono);font-size:11.5px;overflow:auto;max-height:220px', text: truncate(d.result, 4000) }));
     }
     if (kind === 'frame' || kind === 'fileframe') {
+      const title = d.title || (d.art && d.art.name) || '沙箱预览';
       const card = el('div', { class: 'toolcard' },
-        el('div', { class: 'hd' }, el('b', { text: d.title || (d.art && d.art.name) || '沙箱预览' }), el('span', { class: 'badge', text: 'sandbox=allow-scripts' })));
+        el('div', { class: 'hd' }, el('b', { text: title }), el('span', { class: 'badge', text: 'sandbox' }), el('span', { style: 'flex:1' })));
       if (d.art) card.append(this.artifactNode(d.art));
-      const holder = el('div', { class: 'frame' });
-      holder.style.background = d.themeDark ? '#111' : '';
-      card.append(holder);
-      const html = d.html || (d.art ? '' : '');
+
+      // 幻灯片 / 独立 HTML 文件：走 blob 预览
       if (d.previewUrl || d.art) {
-        const bar = el('div', { class: 'bar' }, el('span', { text: '幻灯片预览（需联网加载 reveal.js）' }));
-        holder.append(bar);
+        const holder = el('div', { class: 'frame' });
+        card.append(holder);
+        holder.append(el('div', { class: 'bar' }, el('span', { text: '预览（需联网加载 reveal.js）' })));
         const slot = el('div');
         holder.append(slot);
-        const mount = async () => {
+        setTimeout(async () => {
           let url = d.previewUrl;
           if (!url && d.art) {
             const blob = await resolveArtifactBlob(d.art);
-            if (!blob) { slot.append(el('div', { class: 'hint', style: 'padding:16px', text: '预览不可用：文件内容已不在本地，请重新生成或直接下载。' })); return; }
+            if (!blob) { slot.append(el('div', { class: 'hint', style: 'padding:16px', text: '预览不可用：内容已不在本地，请重新生成或下载。' })); return; }
             url = URL.createObjectURL(blob);
           }
-          slot.innerHTML = '';
           slot.append(el('iframe', { sandbox: 'allow-scripts allow-popups', src: url, style: 'height:420px' }));
-        };
-        mount();
-      } else {
-        holder.append(el('div', { class: 'bar' }, el('span', { text: '沙箱内渲染 · 交互事件会回传给 Agent' })));
-        Sandbox.renderHTML(holder, html, { height: d.height || 380, title: d.title });
+        }, 0);
+        return card;
       }
+
+      /* 内联 HTML 沙箱
+         策略：默认不自动执行（避免「重渲染就把所有页面重跑一遍」导致卡死/闪退），
+         只有最新生成的那一个自动运行，其余给「运行」按钮让用户点。 */
+      const html = String(d.html || '');
+      // 只用唯一 id 做 key；没有 id 的历史数据才退回内容签名
+      const key = d._uid || d._key || ('f:' + title + ':' + html.length + ':' + (d.height || 220));
+      d._key = key;
+
+      const holder = el('div', { class: 'frame' });
+      const bar = el('div', { class: 'bar' }, el('span', { text: '沙箱内渲染 · 交互事件会回传给 Agent' }), el('span', { style: 'flex:1' }));
+      const stage = el('div');
+      holder.append(bar, stage);
+      card.append(holder);
+
+      const renderIdle = (msg) => {
+        stage.innerHTML = '';
+        stage.append(el('div', { class: 'sbxidle' },
+          el('span', { text: msg || '预览未运行' }),
+          el('button', { class: 'btn sm', text: '运行预览', onclick: () => run() })));
+        bar.querySelectorAll('.barstop,.barrun').forEach((b) => b.remove());
+        bar.append(el('button', { class: 'barrun', text: '运行', onclick: () => run() }));
+      };
+
+      const run = () => {
+        // 已有活着的实例就复用（重渲染时不重启）
+        let sbx = this._sbx.get(key);
+        if (sbx) {
+          stage.innerHTML = '';
+          stage.append(sbx.iframe);
+        } else {
+          stage.innerHTML = '';
+          sbx = Sandbox.renderHTML(stage, html, { height: d.height || 220, title });
+          this._sbx.set(key, sbx);
+          this._frames.set(key, sbx.iframe);
+          // 缓存上限：超过就销毁最旧的，避免长会话堆积
+          if (this._sbx.size > 8) {
+            const k0 = this._sbx.keys().next().value;
+            const old = this._sbx.get(k0);
+            if (old) old.destroy();
+            this._sbx.delete(k0); this._frames.delete(k0);
+          }
+        }
+        bar.querySelectorAll('.barstop,.barrun').forEach((b) => b.remove());
+        bar.append(el('button', { class: 'barstop', text: '停止', title: '掐断这个预览', onclick: () => {
+          const s2 = this._sbx.get(key);
+          if (s2) { s2.stop(); this._sbx.delete(key); this._frames.delete(key); }
+          if (this._autoRunKey === key) this._autoRunKey = '';
+          renderIdle('已停止');
+        } }));
+      };
+
+      if (this._autoRunKey === key) run();
+      else renderIdle();
       return card;
     }
     if (kind === 'chart') {
@@ -492,14 +564,56 @@ const UI = {
       if (d.source === 'aaim-sandbox' || d.__aaimFrame && d.type === 'event') this.sandboxEvent(d);
     });
   },
+  /** 沙箱回传的交互事件
+     关键：这是高频来源（动画/拖拽类页面每秒可达 60 次）。
+     绝不能每条都（1）塞进会话消息（2）同步写 localStorage —— 那会 O(n²) 卡死并最终闪退。 */
+  _evt: { map: new Map(), lastSave: 0, saveTimer: null },
+
   sandboxEvent(d) {
     if (!d || d.type !== 'event') return;
-    const line = `沙箱事件：${d.name} → ${truncate(JSON.stringify(d.payload), 200)}`;
-    toast(line, '', 2600);
-    State.audit.push({ ts: Date.now(), tool: 'sandbox_event', args: d, ok: true, ms: 0, summary: line });
-    // 把事件作为上下文附言（不打断当前任务）
+    const now = Date.now();
     const s = State.current();
-    s.messages.push({ role: 'user', content: `【沙箱事件】${line}\n（这是页面内沙箱回传的交互事件，可据此继续或说明）`, ts: Date.now(), silent: true });
-    State.saveSessions();
+    if (!Array.isArray(s.sandboxLog)) s.sandboxLog = [];
+
+    const name = String(d.name || 'event').slice(0, 40);
+
+    // 1) 同名事件在 600ms 窗口内合并：只保留一条，累加次数与最新 payload
+    const st = this._evt.map.get(name) || { count: 0, lastAt: 0, firstToast: false };
+    st.count++;
+    const tooSoon = now - st.lastAt < 600;
+    st.lastAt = now;
+    this._evt.map.set(name, st);
+
+    const open = s.sandboxLog.find((x) => x.name === name);
+    if (open) {
+      open.count = st.count;
+      open.payload = d.payload;
+      open.ts = now;
+    } else {
+      s.sandboxLog.push({ ts: now, name, payload: d.payload, count: st.count });
+      // 2) 硬上限：只保留最近 40 条，绝不无界增长
+      if (s.sandboxLog.length > 40) s.sandboxLog.shift();
+    }
+
+    // 3) 每种事件名只提示一次，且高频事件完全不提示（避免 toast 刷屏占满 DOM）
+    if (!st.firstToast && !tooSoon) {
+      st.firstToast = true;
+      toast(`沙箱回传：${name}`, '', 2000);
+    }
+
+    // 4) 审计只记合并后的事件（否则每秒 60 条纯属浪费），并保留上限
+    if (!tooSoon) {
+      State.audit.push({ ts: now, tool: 'sandbox_event', args: { name, payload: d.payload }, ok: true, ms: 0, summary: name });
+      if (State.audit.length > 500) State.audit.splice(0, State.audit.length - 500);
+    }
+
+    // 5) 延迟合并写盘，最多每 1.5 秒一次，杜绝每条都全量序列化
+    if (!this._evt.saveTimer) {
+      this._evt.saveTimer = setTimeout(() => {
+        this._evt.saveTimer = null;
+        try { State.saveSessions(); } catch { }
+      }, 1500);
+    }
   }
+
 };

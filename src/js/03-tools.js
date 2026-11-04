@@ -43,6 +43,11 @@ const Tools = {
       out = { ok: false, summary: (e && e.message) || String(e), error: 'exception' };
     }
     out.ms = Math.round(performance.now() - t0);
+    // 每个可视结果给一个稳定唯一 id：沙箱缓存、自动运行标记都靠它区分
+    // （不能用「内容签名」，否则两次生成同样的 HTML 会共用同一个 iframe）
+    if (out.display && typeof out.display === 'object' && !out.display._uid) {
+      out.display._uid = uid('viz');
+    }
     State.usage.toolCalls++;
     State.audit.push({ ts: Date.now(), tool: name, args, ok: out.ok, ms: out.ms, summary: truncate(out.summary, 200) });
     return out;
@@ -228,29 +233,143 @@ window.addEventListener('message',function(){});
     });
   },
 
-  /** 渲染任意 HTML 到可见沙箱 iframe（可选中交互），并桥接 postMessage 事件回传 */
-  renderHTML(container, html, { height = 380, title = '沙箱预览', allowEventBack = true } = {}) {
-    const bridge = `<script>
-(function(){var send=function(o){parent.postMessage(Object.assign({__aaimFrame:true},o),'*')};
-send({type:'ready'});
-window.addEventListener('error',function(e){send({type:'error',message:String(e.message)})});
-document.addEventListener('click',function(e){var t=e.target;send({type:'event',name:'click',payload:{tag:t&&t.tagName,id:t&&t.id,text:(t&&t.innerText||'').slice(0,120)}})},true);
+  /** 渲染任意 HTML 到可见沙箱 iframe，并桥接 postMessage 事件回传
+     两层保护：
+       1) 子页开头注入 guard：限速 postMessage、给 setInterval/rAF/递归 setTimeout 设上限
+       2) srcdoc 用 sandbox="allow-scripts"（无 allow-same-origin），Chromium 会把它隔离到独立进程，
+          即使写了死循环也只卡沙箱，不会拖死宿主页面
+     另外提供 stop()，用户可随时掐断跑飞的页面。 */
+  renderHTML(container, html, { height = 220, title = '沙箱预览', allowEventBack = true } = {}) {
+    // 模型经常把结束标签写成带反斜杠的形式（JSON 转义习惯），直接塞进 HTML 会让 script 永不闭合，
+    // 后面的桥接脚本被吞进脚本体，表现为「预览出来了但交互事件完全不上报」。
+    const body = String(html || '').replace(/<\\\/(script)/gi, '</$1');
+
+    // —— guard：必须在用户脚本之前执行，所以插到最前面 ——
+    const guard = `<script>
+(function(){
+  var MAX_PER_SEC = 10;          // 每秒最多回传 10 条
+  var wStart = 0, wCount = 0;
+  var origPost = (window.parent && window.parent.postMessage) ? window.parent.postMessage.bind(window.parent) : function(){};
+  window.__aaimSend = function(payload){
+    var now = Date.now();
+    if (now - wStart > 1000) { wStart = now; wCount = 0; }
+    if (wCount >= MAX_PER_SEC) return false;
+    wCount++;
+    try { origPost(payload, '*'); return true; } catch (e) { return false; }
+  };
+  // 给 setInterval 设下限与总次数上限
+  var _si = window.setInterval;
+  window.setInterval = function(fn, ms) {
+    var d = Math.max(16, Number(ms) || 0), n = 0, id = null;
+    id = _si(function(){ if (++n > 60000) { try { window.clearInterval(id); } catch(e){} return; } try { fn(); } catch(e){} }, d);
+    return id;
+  };
+  // 限制 setTimeout(...,0) 递归链
+  var _st = window.setTimeout, chain = 0;
+  window.setTimeout = function(fn, ms) {
+    var d = Math.max(0, Number(ms) || 0), zero = d === 0;
+    if (zero) { chain++; if (chain > 5000) return 0; }
+    return _st(function(){ if (zero) chain--; try { fn(); } catch(e){} }, d);
+  };
+  // 测量用的基础样式：
+  //  · margin:0 去掉默认 8px 边框空白
+  //  · display:flow-root 建立 BFC，阻止子元素 margin 塌陷穿透 body
+  //    （否则 <h3>/<p> 的上下外边距跑到盒外，量出来偏小，右边就会出现滚动条）
+  //  · scrollbar-width:none 避免宽度被滚动条占掉
+  try {
+    var st = document.createElement('style');
+    // body 给 14px 内边距：预览内容不贴边，也避免首元素 margin 被 BFC 吸收后顶部发空
+    st.textContent = 'html{margin:0;padding:0}body{margin:0;padding:14px;display:flow-root;' +
+      'font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6}' +
+      'body>:first-child{margin-top:0}body>:last-child{margin-bottom:0}' +
+      'html{scrollbar-width:none;-ms-overflow-style:none}' +
+      'html::-webkit-scrollbar{display:none}';
+    (document.head || document.documentElement).appendChild(st);
+  } catch (e) {}
+  // 限制 requestAnimationFrame 总帧数
+  var _raf = window.requestAnimationFrame, frames = 0;
+  window.requestAnimationFrame = function(fn) {
+    return _raf(function(t){ if (++frames > 60000) return; try { fn(t); } catch(e){} });
+  };
 })();
 <\/script>`;
-    const body = String(html);
-    const inject = /<\/body>/i.test(body) ? body.replace(/<\/body>/i, bridge + '</body>') : body + bridge;
-    const iframe = el('iframe', { sandbox: 'allow-scripts', srcdoc: inject, style: `height:${height}px`, title });
+
+    const bridge = `<script>
+(function(){
+  var send = function(o){ if (window.__aaimSend) window.__aaimSend(Object.assign({__aaimFrame:true}, o)); };
+  send({type:'ready'});
+  window.addEventListener('error', function(e){ send({type:'error', message:String(e.message)}); });
+  // 上报真实内容高度：父页据此自适应，避免固定 380px 时留出大片空白
+  var lastH = -1, raf = 0;
+  function reportHeight(){
+    raf = 0;
+    var d = document.documentElement, b = document.body;
+    // 精确算法：取「最后一个可见元素的实际底边」，再补上它的下外边距。
+    // 直接用 body.scrollHeight / getBoundingClientRect 会把末尾的 margin 与 body 自身高度算重，
+    // 表现为预览底部多出 40 多 px 空白。
+    var h = 0;
+    var root = b || d;
+    if (root) {
+      var kids = root.children, lastBottom = 0, lastMb = 0;
+      for (var i = 0; i < kids.length; i++) {
+        var el2 = kids[i];
+        var tag = (el2.tagName || '').toUpperCase();
+        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK' || tag === 'META') continue;
+        var rr = el2.getBoundingClientRect();
+        if (rr.height === 0 && rr.width === 0) continue;
+        var mb = parseFloat(getComputedStyle(el2).marginBottom) || 0;
+        if (rr.bottom > lastBottom) { lastBottom = rr.bottom; lastMb = mb; }
+      }
+      if (lastBottom > 0) {
+        // 还要加上 body 自身的下内边距，否则底部 padding 会被裁掉
+        var pb = (root === b) ? (parseFloat(getComputedStyle(b).paddingBottom) || 0) : 0;
+        h = Math.ceil(lastBottom + lastMb + pb);
+      } else {
+        h = Math.ceil((root === b ? b.scrollHeight : d.scrollHeight) || 0);
+      }
+    }
+    if (h && Math.abs(h - lastH) > 4) { lastH = h; send({type:'height', h: h}); }
+  }
+  function schedule(){ if (!raf) raf = setTimeout(reportHeight, 60); }
+  window.addEventListener('load', schedule);
+  document.addEventListener('DOMContentLoaded', schedule);
+  if (window.ResizeObserver) { try { new ResizeObserver(schedule).observe(document.documentElement); } catch(e){} }
+  setTimeout(schedule, 120); setTimeout(schedule, 600); setTimeout(schedule, 1500);
+})();
+<\/script>`;
+
+    // 组装：guard 放最前，bridge 放最后
+    let doc = body;
+    if (/<head[^>]*>/i.test(doc)) doc = doc.replace(/<head[^>]*>/i, (m) => m + guard);
+    else if (/<html[^>]*>/i.test(doc)) doc = doc.replace(/<html[^>]*>/i, (m) => m + '<head>' + guard + '</head>');
+    else doc = guard + doc;
+
+    doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, bridge + '</body>') : doc + bridge;
+
+    const iframe = el('iframe', { sandbox: 'allow-scripts', srcdoc: doc, style: `height:${height}px`, title });
     container.append(iframe);
+
+    const minH = 90, maxH = 900;
     const onMsg = (e) => {
       const d = e.data;
       if (!d || !d.__aaimFrame) return;
-      if (d.type === 'event' && allowEventBack) {
-        if (d.name === 'click') return; // 只转发显式 postMessage 事件，避免噪音
+      if (d.type === 'ready') return;
+      if (d.type === 'height') {
+        // 内容自适应：太矮给个下限，太高大留滚动
+        // 只加 6px 呼吸空间；body 已建 BFC，尾部 margin 已经算进去了
+        const h = Math.max(minH, Math.min(maxH, Math.ceil(Number(d.h) || 0) + 6));
+        iframe.style.height = h + 'px';
+        return;
       }
-      UI.sandboxEvent(d);
+      if (d.type === 'error') { UI.sandboxRunError && UI.sandboxRunError(d.message); return; }
+      if (d.type === 'event' && allowEventBack) UI.sandboxEvent(d);
     };
     window.addEventListener('message', onMsg);
-    return { iframe, destroy() { window.removeEventListener('message', onMsg); iframe.remove(); } };
+    return {
+      iframe,
+      stop() { try { iframe.srcdoc = ''; } catch { } try { iframe.remove(); } catch { } window.removeEventListener('message', onMsg); },
+      destroy() { window.removeEventListener('message', onMsg); try { iframe.remove(); } catch { } }
+    };
   }
 };
 

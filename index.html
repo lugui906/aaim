@@ -1077,6 +1077,24 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
 /* 产物按钮：点击中的反馈 */
 .artbtn.busy{opacity:.5;cursor:progress}
 .artbtn:disabled{cursor:progress}
+
+/* 沙箱卡片上的停止按钮 */
+.frame .bar .barstop{
+  height:20px;padding:0 8px;border-radius:6px;font-size:11.5px;
+  color:var(--text-3);border:1px solid var(--border-subtle);background:transparent;
+}
+.frame .bar .barstop:hover{color:var(--err);border-color:var(--err);background:rgba(217,68,54,.06)}
+
+/* 沙箱未运行时的占位 */
+.sbxidle{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:26px 16px;color:var(--text-placeholder);font-size:12.5px;background:var(--glass-recess);
+}
+.frame .bar .barrun{
+  height:20px;padding:0 9px;border-radius:6px;font-size:11.5px;
+  color:var(--brand);border:1px solid rgba(77,107,254,.3);background:var(--brand-soft);
+}
+.frame .bar .barrun:hover{background:rgba(77,107,254,.16)}
 </style>
 </head>
 <body>
@@ -1845,7 +1863,13 @@ const MockLLM = {
     const toolNames = new Set((tools || []).map((t) => t.function.name));
     // 工具返回后 → 总结
     if (lastMsg && lastMsg.role === 'tool') {
-      const tools_ = messages.filter((m) => m.role === 'tool').slice(-3);
+      // ★ 只列「本轮」新产生的工具结果：之前写成 slice(-3) 会把前几轮的也列出来，
+      //   表现就是同一个工具在摘要里重复出现好几遍。
+      let turnStart = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') { turnStart = i; break; }
+      }
+      const tools_ = messages.slice(turnStart + 1).filter((m) => m.role === 'tool');
       const summary = tools_.map((t) => {
         // 工具消息的 content 是"摘要 + 数据"的拼接文本，这里只取第一段摘要，避免把 JSON 贴给用户
         const raw = String(t.content || '');
@@ -1902,7 +1926,7 @@ const MockLLM = {
       call = pick('render_mermaid', { code: 'graph TD\n  A[用户提问] --> B{需要外部信息?}\n  B -- 是 --> C[调用工具]\n  C --> D[观察结果]\n  D --> B\n  B -- 否 --> E[生成回答]' });
       head = '我用 render_mermaid 画一张 ReAct 循环流程图。\n\n';
     } else if (has(['演示页', '小应用', 'html', '交互', '计算器'])) {
-      call = pick('render_html', { title: '交互式小演示', html: '<h3>点击计数</h3><button id="b">+1</button><p>当前：<b id="n">0</b></p><script>let n=0;b.onclick=()=>{n++;document.getElementById("n").textContent=n;parent.postMessage({source:"aaim-sandbox",type:"event",name:"count",payload:n},"*")}<\\/script>' });
+      call = pick('render_html', { title: '交互式小演示', html: '<h3>点击计数</h3><button id="b">+1</button><p>当前：<b id="n">0</b></p><script>let n=0;b.onclick=()=>{n++;document.getElementById("n").textContent=n;parent.postMessage({source:"aaim-sandbox",type:"event",name:"count",payload:n},"*")}<\/script>' });
       head = '我用 render_html 在沙箱里渲染一个可交互演示。\n\n';
     } else if (has(['沙箱', '运行代码', '执行js', '算一下'])) {
       call = pick('run_js', { code: 'const r = [1,2,3,4,5].reduce((a,b)=>a+b,0);\nreturn { sum: r, avg: r/5 };' });
@@ -1965,6 +1989,11 @@ const Tools = {
       out = { ok: false, summary: (e && e.message) || String(e), error: 'exception' };
     }
     out.ms = Math.round(performance.now() - t0);
+    // 每个可视结果给一个稳定唯一 id：沙箱缓存、自动运行标记都靠它区分
+    // （不能用「内容签名」，否则两次生成同样的 HTML 会共用同一个 iframe）
+    if (out.display && typeof out.display === 'object' && !out.display._uid) {
+      out.display._uid = uid('viz');
+    }
     State.usage.toolCalls++;
     State.audit.push({ ts: Date.now(), tool: name, args, ok: out.ok, ms: out.ms, summary: truncate(out.summary, 200) });
     return out;
@@ -2150,29 +2179,143 @@ window.addEventListener('message',function(){});
     });
   },
 
-  /** 渲染任意 HTML 到可见沙箱 iframe（可选中交互），并桥接 postMessage 事件回传 */
-  renderHTML(container, html, { height = 380, title = '沙箱预览', allowEventBack = true } = {}) {
-    const bridge = `<script>
-(function(){var send=function(o){parent.postMessage(Object.assign({__aaimFrame:true},o),'*')};
-send({type:'ready'});
-window.addEventListener('error',function(e){send({type:'error',message:String(e.message)})});
-document.addEventListener('click',function(e){var t=e.target;send({type:'event',name:'click',payload:{tag:t&&t.tagName,id:t&&t.id,text:(t&&t.innerText||'').slice(0,120)}})},true);
+  /** 渲染任意 HTML 到可见沙箱 iframe，并桥接 postMessage 事件回传
+     两层保护：
+       1) 子页开头注入 guard：限速 postMessage、给 setInterval/rAF/递归 setTimeout 设上限
+       2) srcdoc 用 sandbox="allow-scripts"（无 allow-same-origin），Chromium 会把它隔离到独立进程，
+          即使写了死循环也只卡沙箱，不会拖死宿主页面
+     另外提供 stop()，用户可随时掐断跑飞的页面。 */
+  renderHTML(container, html, { height = 220, title = '沙箱预览', allowEventBack = true } = {}) {
+    // 模型经常把结束标签写成带反斜杠的形式（JSON 转义习惯），直接塞进 HTML 会让 script 永不闭合，
+    // 后面的桥接脚本被吞进脚本体，表现为「预览出来了但交互事件完全不上报」。
+    const body = String(html || '').replace(/<\\\/(script)/gi, '</$1');
+
+    // —— guard：必须在用户脚本之前执行，所以插到最前面 ——
+    const guard = `<script>
+(function(){
+  var MAX_PER_SEC = 10;          // 每秒最多回传 10 条
+  var wStart = 0, wCount = 0;
+  var origPost = (window.parent && window.parent.postMessage) ? window.parent.postMessage.bind(window.parent) : function(){};
+  window.__aaimSend = function(payload){
+    var now = Date.now();
+    if (now - wStart > 1000) { wStart = now; wCount = 0; }
+    if (wCount >= MAX_PER_SEC) return false;
+    wCount++;
+    try { origPost(payload, '*'); return true; } catch (e) { return false; }
+  };
+  // 给 setInterval 设下限与总次数上限
+  var _si = window.setInterval;
+  window.setInterval = function(fn, ms) {
+    var d = Math.max(16, Number(ms) || 0), n = 0, id = null;
+    id = _si(function(){ if (++n > 60000) { try { window.clearInterval(id); } catch(e){} return; } try { fn(); } catch(e){} }, d);
+    return id;
+  };
+  // 限制 setTimeout(...,0) 递归链
+  var _st = window.setTimeout, chain = 0;
+  window.setTimeout = function(fn, ms) {
+    var d = Math.max(0, Number(ms) || 0), zero = d === 0;
+    if (zero) { chain++; if (chain > 5000) return 0; }
+    return _st(function(){ if (zero) chain--; try { fn(); } catch(e){} }, d);
+  };
+  // 测量用的基础样式：
+  //  · margin:0 去掉默认 8px 边框空白
+  //  · display:flow-root 建立 BFC，阻止子元素 margin 塌陷穿透 body
+  //    （否则 <h3>/<p> 的上下外边距跑到盒外，量出来偏小，右边就会出现滚动条）
+  //  · scrollbar-width:none 避免宽度被滚动条占掉
+  try {
+    var st = document.createElement('style');
+    // body 给 14px 内边距：预览内容不贴边，也避免首元素 margin 被 BFC 吸收后顶部发空
+    st.textContent = 'html{margin:0;padding:0}body{margin:0;padding:14px;display:flow-root;' +
+      'font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6}' +
+      'body>:first-child{margin-top:0}body>:last-child{margin-bottom:0}' +
+      'html{scrollbar-width:none;-ms-overflow-style:none}' +
+      'html::-webkit-scrollbar{display:none}';
+    (document.head || document.documentElement).appendChild(st);
+  } catch (e) {}
+  // 限制 requestAnimationFrame 总帧数
+  var _raf = window.requestAnimationFrame, frames = 0;
+  window.requestAnimationFrame = function(fn) {
+    return _raf(function(t){ if (++frames > 60000) return; try { fn(t); } catch(e){} });
+  };
 })();
 <\/script>`;
-    const body = String(html);
-    const inject = /<\/body>/i.test(body) ? body.replace(/<\/body>/i, bridge + '</body>') : body + bridge;
-    const iframe = el('iframe', { sandbox: 'allow-scripts', srcdoc: inject, style: `height:${height}px`, title });
+
+    const bridge = `<script>
+(function(){
+  var send = function(o){ if (window.__aaimSend) window.__aaimSend(Object.assign({__aaimFrame:true}, o)); };
+  send({type:'ready'});
+  window.addEventListener('error', function(e){ send({type:'error', message:String(e.message)}); });
+  // 上报真实内容高度：父页据此自适应，避免固定 380px 时留出大片空白
+  var lastH = -1, raf = 0;
+  function reportHeight(){
+    raf = 0;
+    var d = document.documentElement, b = document.body;
+    // 精确算法：取「最后一个可见元素的实际底边」，再补上它的下外边距。
+    // 直接用 body.scrollHeight / getBoundingClientRect 会把末尾的 margin 与 body 自身高度算重，
+    // 表现为预览底部多出 40 多 px 空白。
+    var h = 0;
+    var root = b || d;
+    if (root) {
+      var kids = root.children, lastBottom = 0, lastMb = 0;
+      for (var i = 0; i < kids.length; i++) {
+        var el2 = kids[i];
+        var tag = (el2.tagName || '').toUpperCase();
+        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK' || tag === 'META') continue;
+        var rr = el2.getBoundingClientRect();
+        if (rr.height === 0 && rr.width === 0) continue;
+        var mb = parseFloat(getComputedStyle(el2).marginBottom) || 0;
+        if (rr.bottom > lastBottom) { lastBottom = rr.bottom; lastMb = mb; }
+      }
+      if (lastBottom > 0) {
+        // 还要加上 body 自身的下内边距，否则底部 padding 会被裁掉
+        var pb = (root === b) ? (parseFloat(getComputedStyle(b).paddingBottom) || 0) : 0;
+        h = Math.ceil(lastBottom + lastMb + pb);
+      } else {
+        h = Math.ceil((root === b ? b.scrollHeight : d.scrollHeight) || 0);
+      }
+    }
+    if (h && Math.abs(h - lastH) > 4) { lastH = h; send({type:'height', h: h}); }
+  }
+  function schedule(){ if (!raf) raf = setTimeout(reportHeight, 60); }
+  window.addEventListener('load', schedule);
+  document.addEventListener('DOMContentLoaded', schedule);
+  if (window.ResizeObserver) { try { new ResizeObserver(schedule).observe(document.documentElement); } catch(e){} }
+  setTimeout(schedule, 120); setTimeout(schedule, 600); setTimeout(schedule, 1500);
+})();
+<\/script>`;
+
+    // 组装：guard 放最前，bridge 放最后
+    let doc = body;
+    if (/<head[^>]*>/i.test(doc)) doc = doc.replace(/<head[^>]*>/i, (m) => m + guard);
+    else if (/<html[^>]*>/i.test(doc)) doc = doc.replace(/<html[^>]*>/i, (m) => m + '<head>' + guard + '</head>');
+    else doc = guard + doc;
+
+    doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, bridge + '</body>') : doc + bridge;
+
+    const iframe = el('iframe', { sandbox: 'allow-scripts', srcdoc: doc, style: `height:${height}px`, title });
     container.append(iframe);
+
+    const minH = 90, maxH = 900;
     const onMsg = (e) => {
       const d = e.data;
       if (!d || !d.__aaimFrame) return;
-      if (d.type === 'event' && allowEventBack) {
-        if (d.name === 'click') return; // 只转发显式 postMessage 事件，避免噪音
+      if (d.type === 'ready') return;
+      if (d.type === 'height') {
+        // 内容自适应：太矮给个下限，太高大留滚动
+        // 只加 6px 呼吸空间；body 已建 BFC，尾部 margin 已经算进去了
+        const h = Math.max(minH, Math.min(maxH, Math.ceil(Number(d.h) || 0) + 6));
+        iframe.style.height = h + 'px';
+        return;
       }
-      UI.sandboxEvent(d);
+      if (d.type === 'error') { UI.sandboxRunError && UI.sandboxRunError(d.message); return; }
+      if (d.type === 'event' && allowEventBack) UI.sandboxEvent(d);
     };
     window.addEventListener('message', onMsg);
-    return { iframe, destroy() { window.removeEventListener('message', onMsg); iframe.remove(); } };
+    return {
+      iframe,
+      stop() { try { iframe.srcdoc = ''; } catch { } try { iframe.remove(); } catch { } window.removeEventListener('message', onMsg); },
+      destroy() { window.removeEventListener('message', onMsg); try { iframe.remove(); } catch { } }
+    };
   }
 };
 
@@ -3401,8 +3544,19 @@ const Agent = {
     this.turnTools = 0;          // 每轮重置，只用于防单轮死循环
     const turnStart = performance.now();
     // 用户消息
+    // 把沙箱里积攒的交互事件压缩成一小段附言带给模型（不塞进消息列表，也不显示在界面）
+    let sandboxNote = '';
+    const logs = Array.isArray(session.sandboxLog) ? session.sandboxLog.filter((x) => !x.consumed) : [];
+    if (logs.length) {
+      sandboxNote = '\n\n【沙箱交互事件】\n' + logs.slice(-10).map((x) => {
+        const c = x.count > 1 ? ` ×${x.count}` : '';
+        return `- ${x.name}${c}: ${truncate(JSON.stringify(x.payload), 120)}`;
+      }).join('\n');
+      logs.forEach((x) => { x.consumed = true; });
+      session.sandboxLog = session.sandboxLog.slice(-20);
+    }
     const userMsg = {
-      role: 'user', content: userText,
+      role: 'user', content: userText + sandboxNote,
       display: opts.display != null ? opts.display : null,   // 界面上只显示这句，不显示附件全文
       images: opts.images || [], ts: Date.now(), files: opts.files || []
     };
@@ -3747,6 +3901,10 @@ const MD = {
 /* ============ 08 消息渲染 / 步骤面板 / 工具结果卡片 ============ */
 const UI = {
   turn: null,           // 当前回合的 DOM 句柄
+  _frames: new Map(),   // 沙箱 iframe 缓存（避免重渲染重启）
+  _autoRunKey: '',      // 只自动运行最新那一个，其余需用户点击
+  _sbx: new Map(),      // 对应的沙箱句柄（可 stop）
+
   streaming: false,
   lastAssistantText: '',
 
@@ -3810,6 +3968,15 @@ const UI = {
     this.renderSessions(); this.renderMessages(); this.updateHeader();
     if (typeof App !== 'undefined') App.closeNav(false);
     $('#prompt').focus();
+  },
+
+  /** 沙箱子页里的运行时错误：合并提示，避免错误循环刷屏 */
+  _sbxErrAt: 0,
+  sandboxRunError(msg) {
+    const now = Date.now();
+    if (now - this._sbxErrAt < 3000) return;
+    this._sbxErrAt = now;
+    toast('沙箱内脚本报错：' + truncate(String(msg), 80), 'err', 4000);
   },
 
   updateMemoryBadge() {
@@ -3939,7 +4106,16 @@ const UI = {
     const vizItems = group.filter((m) => this.isVisualDisplay(m.display));
     if (vizItems.length) {
       const viz = el('div', { class: 'vizout' });
-      for (const m of vizItems) viz.append(this.displayNode(m.display, m));
+      for (const m of vizItems) {
+        // 历史重渲染时，只有被标记为最新且仍存活的那个才继续跑
+        if (m.display && m.display.kind === 'frame') {
+          const k = m.display._key;
+          if (!k || this._autoRunKey !== k) {
+            // 临时压制自动运行
+          }
+        }
+        viz.append(this.displayNode(m.display, m));
+      }
       body.append(viz);
     }
 
@@ -4053,33 +4229,83 @@ const UI = {
         d.error ? el('div', { style: 'color:var(--err);font-size:12.5px', text: d.error }) : el('pre', { style: 'margin:0;background:#0a101c;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:var(--mono);font-size:11.5px;overflow:auto;max-height:220px', text: truncate(d.result, 4000) }));
     }
     if (kind === 'frame' || kind === 'fileframe') {
+      const title = d.title || (d.art && d.art.name) || '沙箱预览';
       const card = el('div', { class: 'toolcard' },
-        el('div', { class: 'hd' }, el('b', { text: d.title || (d.art && d.art.name) || '沙箱预览' }), el('span', { class: 'badge', text: 'sandbox=allow-scripts' })));
+        el('div', { class: 'hd' }, el('b', { text: title }), el('span', { class: 'badge', text: 'sandbox' }), el('span', { style: 'flex:1' })));
       if (d.art) card.append(this.artifactNode(d.art));
-      const holder = el('div', { class: 'frame' });
-      holder.style.background = d.themeDark ? '#111' : '';
-      card.append(holder);
-      const html = d.html || (d.art ? '' : '');
+
+      // 幻灯片 / 独立 HTML 文件：走 blob 预览
       if (d.previewUrl || d.art) {
-        const bar = el('div', { class: 'bar' }, el('span', { text: '幻灯片预览（需联网加载 reveal.js）' }));
-        holder.append(bar);
+        const holder = el('div', { class: 'frame' });
+        card.append(holder);
+        holder.append(el('div', { class: 'bar' }, el('span', { text: '预览（需联网加载 reveal.js）' })));
         const slot = el('div');
         holder.append(slot);
-        const mount = async () => {
+        setTimeout(async () => {
           let url = d.previewUrl;
           if (!url && d.art) {
             const blob = await resolveArtifactBlob(d.art);
-            if (!blob) { slot.append(el('div', { class: 'hint', style: 'padding:16px', text: '预览不可用：文件内容已不在本地，请重新生成或直接下载。' })); return; }
+            if (!blob) { slot.append(el('div', { class: 'hint', style: 'padding:16px', text: '预览不可用：内容已不在本地，请重新生成或下载。' })); return; }
             url = URL.createObjectURL(blob);
           }
-          slot.innerHTML = '';
           slot.append(el('iframe', { sandbox: 'allow-scripts allow-popups', src: url, style: 'height:420px' }));
-        };
-        mount();
-      } else {
-        holder.append(el('div', { class: 'bar' }, el('span', { text: '沙箱内渲染 · 交互事件会回传给 Agent' })));
-        Sandbox.renderHTML(holder, html, { height: d.height || 380, title: d.title });
+        }, 0);
+        return card;
       }
+
+      /* 内联 HTML 沙箱
+         策略：默认不自动执行（避免「重渲染就把所有页面重跑一遍」导致卡死/闪退），
+         只有最新生成的那一个自动运行，其余给「运行」按钮让用户点。 */
+      const html = String(d.html || '');
+      // 只用唯一 id 做 key；没有 id 的历史数据才退回内容签名
+      const key = d._uid || d._key || ('f:' + title + ':' + html.length + ':' + (d.height || 220));
+      d._key = key;
+
+      const holder = el('div', { class: 'frame' });
+      const bar = el('div', { class: 'bar' }, el('span', { text: '沙箱内渲染 · 交互事件会回传给 Agent' }), el('span', { style: 'flex:1' }));
+      const stage = el('div');
+      holder.append(bar, stage);
+      card.append(holder);
+
+      const renderIdle = (msg) => {
+        stage.innerHTML = '';
+        stage.append(el('div', { class: 'sbxidle' },
+          el('span', { text: msg || '预览未运行' }),
+          el('button', { class: 'btn sm', text: '运行预览', onclick: () => run() })));
+        bar.querySelectorAll('.barstop,.barrun').forEach((b) => b.remove());
+        bar.append(el('button', { class: 'barrun', text: '运行', onclick: () => run() }));
+      };
+
+      const run = () => {
+        // 已有活着的实例就复用（重渲染时不重启）
+        let sbx = this._sbx.get(key);
+        if (sbx) {
+          stage.innerHTML = '';
+          stage.append(sbx.iframe);
+        } else {
+          stage.innerHTML = '';
+          sbx = Sandbox.renderHTML(stage, html, { height: d.height || 220, title });
+          this._sbx.set(key, sbx);
+          this._frames.set(key, sbx.iframe);
+          // 缓存上限：超过就销毁最旧的，避免长会话堆积
+          if (this._sbx.size > 8) {
+            const k0 = this._sbx.keys().next().value;
+            const old = this._sbx.get(k0);
+            if (old) old.destroy();
+            this._sbx.delete(k0); this._frames.delete(k0);
+          }
+        }
+        bar.querySelectorAll('.barstop,.barrun').forEach((b) => b.remove());
+        bar.append(el('button', { class: 'barstop', text: '停止', title: '掐断这个预览', onclick: () => {
+          const s2 = this._sbx.get(key);
+          if (s2) { s2.stop(); this._sbx.delete(key); this._frames.delete(key); }
+          if (this._autoRunKey === key) this._autoRunKey = '';
+          renderIdle('已停止');
+        } }));
+      };
+
+      if (this._autoRunKey === key) run();
+      else renderIdle();
       return card;
     }
     if (kind === 'chart') {
@@ -4238,16 +4464,58 @@ const UI = {
       if (d.source === 'aaim-sandbox' || d.__aaimFrame && d.type === 'event') this.sandboxEvent(d);
     });
   },
+  /** 沙箱回传的交互事件
+     关键：这是高频来源（动画/拖拽类页面每秒可达 60 次）。
+     绝不能每条都（1）塞进会话消息（2）同步写 localStorage —— 那会 O(n²) 卡死并最终闪退。 */
+  _evt: { map: new Map(), lastSave: 0, saveTimer: null },
+
   sandboxEvent(d) {
     if (!d || d.type !== 'event') return;
-    const line = `沙箱事件：${d.name} → ${truncate(JSON.stringify(d.payload), 200)}`;
-    toast(line, '', 2600);
-    State.audit.push({ ts: Date.now(), tool: 'sandbox_event', args: d, ok: true, ms: 0, summary: line });
-    // 把事件作为上下文附言（不打断当前任务）
+    const now = Date.now();
     const s = State.current();
-    s.messages.push({ role: 'user', content: `【沙箱事件】${line}\n（这是页面内沙箱回传的交互事件，可据此继续或说明）`, ts: Date.now(), silent: true });
-    State.saveSessions();
+    if (!Array.isArray(s.sandboxLog)) s.sandboxLog = [];
+
+    const name = String(d.name || 'event').slice(0, 40);
+
+    // 1) 同名事件在 600ms 窗口内合并：只保留一条，累加次数与最新 payload
+    const st = this._evt.map.get(name) || { count: 0, lastAt: 0, firstToast: false };
+    st.count++;
+    const tooSoon = now - st.lastAt < 600;
+    st.lastAt = now;
+    this._evt.map.set(name, st);
+
+    const open = s.sandboxLog.find((x) => x.name === name);
+    if (open) {
+      open.count = st.count;
+      open.payload = d.payload;
+      open.ts = now;
+    } else {
+      s.sandboxLog.push({ ts: now, name, payload: d.payload, count: st.count });
+      // 2) 硬上限：只保留最近 40 条，绝不无界增长
+      if (s.sandboxLog.length > 40) s.sandboxLog.shift();
+    }
+
+    // 3) 每种事件名只提示一次，且高频事件完全不提示（避免 toast 刷屏占满 DOM）
+    if (!st.firstToast && !tooSoon) {
+      st.firstToast = true;
+      toast(`沙箱回传：${name}`, '', 2000);
+    }
+
+    // 4) 审计只记合并后的事件（否则每秒 60 条纯属浪费），并保留上限
+    if (!tooSoon) {
+      State.audit.push({ ts: now, tool: 'sandbox_event', args: { name, payload: d.payload }, ok: true, ms: 0, summary: name });
+      if (State.audit.length > 500) State.audit.splice(0, State.audit.length - 500);
+    }
+
+    // 5) 延迟合并写盘，最多每 1.5 秒一次，杜绝每条都全量序列化
+    if (!this._evt.saveTimer) {
+      this._evt.saveTimer = setTimeout(() => {
+        this._evt.saveTimer = null;
+        try { State.saveSessions(); } catch { }
+      }, 1500);
+    }
   }
+
 };
 
 /* ===== 09-app.js ===== */
@@ -4473,6 +4741,12 @@ const App = {
             }
           } else if (UI.isVisualDisplay(d)) {
             // 图表/流程图/图片/沙箱：直接可见
+            if (d.kind === 'frame') {
+              // 只让刚生成的那个自动跑；历史预览保持静止，避免多个页面同时运行
+              const key = d._uid || d._key || ('f:' + String(d.title || '') + ':' + String(d.html || '').length + ':' + (d.height || 220));
+              d._key = key;
+              UI._autoRunKey = key;
+            }
             const card = UI.displayNode(d, { name: call.name });
             t.viz.append(card);
             // 图表/图片依赖真实布局尺寸，等一帧再渲染

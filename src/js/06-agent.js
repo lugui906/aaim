@@ -97,8 +97,19 @@ const Agent = {
     this.turnTools = 0;          // 每轮重置，只用于防单轮死循环
     const turnStart = performance.now();
     // 用户消息
+    // 把沙箱里积攒的交互事件压缩成一小段附言带给模型（不塞进消息列表，也不显示在界面）
+    let sandboxNote = '';
+    const logs = Array.isArray(session.sandboxLog) ? session.sandboxLog.filter((x) => !x.consumed) : [];
+    if (logs.length) {
+      sandboxNote = '\n\n【沙箱交互事件】\n' + logs.slice(-10).map((x) => {
+        const c = x.count > 1 ? ` ×${x.count}` : '';
+        return `- ${x.name}${c}: ${truncate(JSON.stringify(x.payload), 120)}`;
+      }).join('\n');
+      logs.forEach((x) => { x.consumed = true; });
+      session.sandboxLog = session.sandboxLog.slice(-20);
+    }
     const userMsg = {
-      role: 'user', content: userText,
+      role: 'user', content: userText + sandboxNote,
       display: opts.display != null ? opts.display : null,   // 界面上只显示这句，不显示附件全文
       images: opts.images || [], ts: Date.now(), files: opts.files || []
     };

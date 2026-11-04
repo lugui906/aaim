@@ -220,6 +220,12 @@ const App = {
             }
           } else if (UI.isVisualDisplay(d)) {
             // 图表/流程图/图片/沙箱：直接可见
+            if (d.kind === 'frame') {
+              // 只让刚生成的那个自动跑；历史预览保持静止，避免多个页面同时运行
+              const key = d._uid || d._key || ('f:' + String(d.title || '') + ':' + String(d.html || '').length + ':' + (d.height || 220));
+              d._key = key;
+              UI._autoRunKey = key;
+            }
             const card = UI.displayNode(d, { name: call.name });
             t.viz.append(card);
             // 图表/图片依赖真实布局尺寸，等一帧再渲染

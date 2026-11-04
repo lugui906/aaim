@@ -254,7 +254,13 @@ const MockLLM = {
     const toolNames = new Set((tools || []).map((t) => t.function.name));
     // 工具返回后 → 总结
     if (lastMsg && lastMsg.role === 'tool') {
-      const tools_ = messages.filter((m) => m.role === 'tool').slice(-3);
+      // ★ 只列「本轮」新产生的工具结果：之前写成 slice(-3) 会把前几轮的也列出来，
+      //   表现就是同一个工具在摘要里重复出现好几遍。
+      let turnStart = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') { turnStart = i; break; }
+      }
+      const tools_ = messages.slice(turnStart + 1).filter((m) => m.role === 'tool');
       const summary = tools_.map((t) => {
         // 工具消息的 content 是"摘要 + 数据"的拼接文本，这里只取第一段摘要，避免把 JSON 贴给用户
         const raw = String(t.content || '');
@@ -311,7 +317,7 @@ const MockLLM = {
       call = pick('render_mermaid', { code: 'graph TD\n  A[用户提问] --> B{需要外部信息?}\n  B -- 是 --> C[调用工具]\n  C --> D[观察结果]\n  D --> B\n  B -- 否 --> E[生成回答]' });
       head = '我用 render_mermaid 画一张 ReAct 循环流程图。\n\n';
     } else if (has(['演示页', '小应用', 'html', '交互', '计算器'])) {
-      call = pick('render_html', { title: '交互式小演示', html: '<h3>点击计数</h3><button id="b">+1</button><p>当前：<b id="n">0</b></p><script>let n=0;b.onclick=()=>{n++;document.getElementById("n").textContent=n;parent.postMessage({source:"aaim-sandbox",type:"event",name:"count",payload:n},"*")}<\\/script>' });
+      call = pick('render_html', { title: '交互式小演示', html: '<h3>点击计数</h3><button id="b">+1</button><p>当前：<b id="n">0</b></p><script>let n=0;b.onclick=()=>{n++;document.getElementById("n").textContent=n;parent.postMessage({source:"aaim-sandbox",type:"event",name:"count",payload:n},"*")}<\/script>' });
       head = '我用 render_html 在沙箱里渲染一个可交互演示。\n\n';
     } else if (has(['沙箱', '运行代码', '执行js', '算一下'])) {
       call = pick('run_js', { code: 'const r = [1,2,3,4,5].reduce((a,b)=>a+b,0);\nreturn { sum: r, avg: r/5 };' });
