@@ -1069,6 +1069,10 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
 }
 .msg.user .attach.files .a .achars{color:var(--text-placeholder);flex:0 0 auto}
 .msg.user .msg-tools{margin-top:8px}
+
+/* 预算护栏提示：用警告色而非错误色，避免看起来像崩溃 */
+.errbox.warnbox{border-color:rgba(184,121,26,.32);background:rgba(184,121,26,.05)}
+.errbox.warnbox .errhd{color:var(--warn)}
 </style>
 </head>
 <body>
@@ -1456,7 +1460,7 @@ const DEFAULT_SETTINGS = {
   keepRecent: 6,              // 裁剪时保留的最近消息条数
   tts: { enabled: false, rate: 1, voice: '', maxChars: 280 },
   vision: true,
-  budget: { maxTokens: 200000, maxCost: 0.6, maxToolCalls: 40, priceIn: 2, priceOut: 8 }, // 元/百万 token 的估算单价
+  budget: { maxTokens: 200000, maxCost: 0.6, maxToolCalls: 40, priceIn: 2, priceOut: 8, unlimited: false }, // 元/百万 token 的估算单价
   search: {
     provider: 'deepseek',     // deepseek | tavily | serper | custom | none
     count: 8, needContent: true, searchType: 'web', enableSource: true,
@@ -1513,7 +1517,12 @@ const State = {
 };
 
 function newSession(title = '新会话') {
-  return { id: uid('s'), title, createdAt: Date.now(), updatedAt: Date.now(), messages: [], usage: { inTok: 0, outTok: 0, calls: 0, toolCalls: 0, cost: 0 }, pinned: false };
+  return {
+    id: uid('s'), title, createdAt: Date.now(), updatedAt: Date.now(), messages: [],
+    usage: { inTok: 0, outTok: 0, calls: 0, toolCalls: 0, cost: 0 },
+    spend: { tok: 0, cost: 0 },        // 本会话实际消耗（预算护栏用这个，不是全局累计）
+    pinned: false
+  };
 }
 
 function curProviderConf() { return State.settings.providers[State.settings.provider] || {}; }
@@ -3170,21 +3179,40 @@ const Agent = {
     return sys.concat(flat);
   },
 
-  /* ---- 预算护栏（L3） ---- */
-  budgetLeft() {
-    const b = State.settings.budget, u = State.usage;
-    return {
-      tokens: Math.max(0, b.maxTokens - (u.inTok + u.outTok)),
-      cost: Math.max(0, b.maxCost - u.cost),
-      tools: Math.max(0, b.maxToolCalls - u.toolCalls)
-    };
+  /* ---- 预算护栏（L3）
+     作用域要分清：
+       · 工具调用次数 = 每轮上限（防止单轮死循环）
+       · token / 费用 = 每个会话累计（防止一轮对话花太多）
+     这些都必须可重置，否则攒满后每一轮都会立刻失败，表现为「输出无故停止」。 */
+  turnTools: 0,
+  spendOf() {
+    const s = State.current();
+    if (!s.spend) s.spend = { tok: 0, cost: 0 };
+    return s.spend;
   },
   budgetExceeded() {
-    const l = this.budgetLeft();
-    if (l.tokens <= 0) return '本轮会话 token 预算已用尽（' + State.settings.budget.maxTokens + '）';
-    if (l.cost <= 0) return '本轮会话费用预算已用尽（¥' + State.settings.budget.maxCost + '）';
-    if (l.tools <= 0) return '本轮工具调用次数已达上限（' + State.settings.budget.maxToolCalls + ' 次）';
+    const b = State.settings.budget || {};
+    const maxTools = Number(b.maxToolCalls) || 40;
+    const maxTok = Number(b.maxTokens) || 200000;
+    const maxCost = Number(b.maxCost);
+    const sp = this.spendOf();
+    if (this.turnTools >= maxTools) {
+      return { kind: 'tools', msg: `本轮工具调用已达 ${maxTools} 次上限（防死循环）`, reset: false };
+    }
+    if (!b.unlimited && sp.tok >= maxTok) {
+      return { kind: 'tokens', msg: `本会话已用 ${sp.tok} token，达到上限 ${maxTok}`, reset: true };
+    }
+    if (!b.unlimited && isFinite(maxCost) && maxCost > 0 && sp.cost >= maxCost) {
+      return { kind: 'cost', msg: `本会话估算费用 ¥${sp.cost.toFixed(3)}，达到上限 ¥${maxCost}`, reset: true };
+    }
     return null;
+  },
+  /** 清零本会话消耗；工具次数是每轮自动清零的 */
+  resetBudget() {
+    const s = State.current();
+    s.spend = { tok: 0, cost: 0 };
+    this.turnTools = 0;
+    State.saveSessions();
   },
 
   /* ---- 入队（E1：串行） ---- */
@@ -3214,6 +3242,7 @@ const Agent = {
     const session = State.current();
     const s = State.settings;
     this.stopFlag = false;
+    this.turnTools = 0;          // 每轮重置，只用于防单轮死循环
     const turnStart = performance.now();
     // 用户消息
     const userMsg = {
@@ -3237,7 +3266,11 @@ const Agent = {
       while (step < maxSteps) {
         step++;
         const over = this.budgetExceeded();
-        if (over) throw new Error(over + '。可在 设置 → 预算 里调高上限。');
+        if (over) {
+          const e = new Error(over.msg);
+          e.budget = over;       // 让 onError 渲染「继续（重置预算）」而不是直接死掉
+          throw e;
+        }
         if (this.stopFlag) break;
         const ctx = this.trim([{ role: 'system', content: buildSystemPrompt() }, ...session.messages.filter((m) => m.role !== 'system')], Number(s.contextLimit) || 24000, Number(s.keepRecent) || 6);
         State.abort = new AbortController();
@@ -3262,6 +3295,7 @@ const Agent = {
         const b = s.budget;
         const cost = (inTok / 1e6) * Number(b.priceIn || 0) + (outTok / 1e6) * Number(b.priceOut || 0);
         State.usage.inTok += inTok; State.usage.outTok += outTok; State.usage.calls++; State.usage.cost += cost;
+        { const sp = this.spendOf(); sp.tok += inTok + outTok; sp.cost += cost; }
         session.usage = session.usage || { inTok: 0, outTok: 0, calls: 0, toolCalls: 0, cost: 0 };
         session.usage.inTok += inTok; session.usage.outTok += outTok; session.usage.calls++; session.usage.cost += cost;
         this.hooks.onUsage && this.hooks.onUsage({ inTok, outTok, calls: 1, cost, step });
@@ -3296,6 +3330,7 @@ const Agent = {
             this.hooks.onToolStart && this.hooks.onToolStart(call);
             out = await Tools.exec(call.name, call.arguments, { session });
           }
+          this.turnTools++;
           session.usage.toolCalls = (session.usage.toolCalls || 0) + 1;
           const toolMsg = { role: 'tool', tool_call_id: call.id, name: call.name, content: Tools.toToolText(out), ts: Date.now(), display: out.display, ok: out.ok };
           session.messages.push(toolMsg);
@@ -4288,6 +4323,31 @@ const App = {
         this.setRunning(false);
         const t = UI.turn;
         const msg = (e && e.message) || String(e);
+        // 预算触顶：给「继续执行」，而不是让用户以为程序坏了
+        if (e && e.budget) {
+          const node = el('div', { class: 'msg agent' }, el('div', { class: 'body' },
+            el('div', { class: 'errbox warnbox' },
+              el('div', { class: 'errhd', text: '预算护栏触发' }),
+              el('div', { class: 'errmsg', text: msg }),
+              el('div', { class: 'errhint', text: e.budget.reset
+                ? '这是为了防止一次对话花太多钱。点「继续执行」会清零本会话统计后接着做，也可以在 设置 → 预算 里调高或关掉限制。'
+                : '单轮工具调用过多会被拦下，避免死循环。点「继续执行」会接着再跑一轮。' }),
+              el('div', { class: 'acts' },
+                el('button', { class: 'btn sm primary', text: '继续执行', onclick: () => {
+                  Agent.resetBudget();
+                  node.remove();
+                  Agent.regenerate();
+                } }),
+                el('button', { class: 'btn sm', text: '调高上限', onclick: () => Drawer.open('budget') }),
+                el('button', { class: 'btn sm ghost', text: '关闭护栏', onclick: () => {
+                  State.settings.budget.unlimited = true; State.saveSettings();
+                  toast('已关闭 token / 费用上限（工具次数防死循环仍保留）', 'ok');
+                  Drawer.render();
+                } })))));
+          if (t && t.node.parentNode) t.node.replaceWith(node); else $('#messages').append(node);
+          scrollBottom(true);
+          return;
+        }
         let hint = '';
         if (/Failed to fetch|NetworkError|load failed/i.test(msg)) hint = '常见原因：① 浏览器 CORS 拦截（设置 → 模型 填代理地址）② Base URL 写错 ③ file:// 下部分浏览器限制请求。';
         else if (/401|403/.test(msg)) hint = 'Key 无效或无权限。';
@@ -4968,15 +5028,21 @@ Object.assign(Drawer, {
   /* ---------------- 预算 ---------------- */
   renderBudget(b) {
     const s = State.settings.budget, u = State.usage;
-    b.append(Form.sect('本轮用量'));
+    const sp = Agent.spendOf();
+    b.append(Form.sect('本会话用量'));
     b.append(Form.kv('输入 token', u.inTok.toLocaleString()));
     b.append(Form.kv('输出 token', u.outTok.toLocaleString()));
     b.append(Form.kv('模型调用次数', u.calls));
     b.append(Form.kv('工具调用次数', u.toolCalls));
     b.append(Form.kv('估算费用', '¥' + u.cost.toFixed(4)));
-    b.append(Form.kv('运行时长', State.usage.startedAt ? fmtMs(Date.now() - State.usage.startedAt) : '-'));
+    b.append(Form.kv('护栏已计', sp.tok.toLocaleString() + ' tok / ¥' + sp.cost.toFixed(3)));
+    b.append(el('div', { class: 'row', style: 'margin:8px 0 4px' },
+      el('button', { class: 'btn sm', text: '清零本会话预算统计', onclick: () => { Agent.resetBudget(); this.render(); toast('已清零', 'ok'); } }),
+      el('span', { style: 'flex:1' })));
 
     b.append(Form.sect('护栏（L3）'));
+    b.append(Form.toggle('关闭 token / 费用上限', '关掉后只保留「每轮工具调用次数」防死循环；适合本地模型或不在乎花费时', !!s.unlimited, (v) => { s.unlimited = v; this.save(); this.render(); }));
+    b.append(el('div', { class: 'hint', style: 'margin-bottom:6px' }, 'token 与费用按**每个会话**累计，新建会话自动归零；工具次数按**每一轮**计，避免单轮死循环。'));
     b.append(Form.field('token 上限', Form.num(s.maxTokens, (v) => { s.maxTokens = Math.max(1000, v); this.save(); }, { min: 1000, step: 1000 }), '输入+输出合计，超出即中止本轮'));
     b.append(Form.field('费用上限（元）', Form.num(s.maxCost, (v) => { s.maxCost = Math.max(0, v); this.save(); }, { min: 0, step: 0.1 })));
     b.append(Form.field('工具调用上限（次）', Form.num(s.maxToolCalls, (v) => { s.maxToolCalls = Math.max(1, v); this.save(); }, { min: 1 })));

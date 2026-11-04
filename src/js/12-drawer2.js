@@ -166,15 +166,21 @@ Object.assign(Drawer, {
   /* ---------------- 预算 ---------------- */
   renderBudget(b) {
     const s = State.settings.budget, u = State.usage;
-    b.append(Form.sect('本轮用量'));
+    const sp = Agent.spendOf();
+    b.append(Form.sect('本会话用量'));
     b.append(Form.kv('输入 token', u.inTok.toLocaleString()));
     b.append(Form.kv('输出 token', u.outTok.toLocaleString()));
     b.append(Form.kv('模型调用次数', u.calls));
     b.append(Form.kv('工具调用次数', u.toolCalls));
     b.append(Form.kv('估算费用', '¥' + u.cost.toFixed(4)));
-    b.append(Form.kv('运行时长', State.usage.startedAt ? fmtMs(Date.now() - State.usage.startedAt) : '-'));
+    b.append(Form.kv('护栏已计', sp.tok.toLocaleString() + ' tok / ¥' + sp.cost.toFixed(3)));
+    b.append(el('div', { class: 'row', style: 'margin:8px 0 4px' },
+      el('button', { class: 'btn sm', text: '清零本会话预算统计', onclick: () => { Agent.resetBudget(); this.render(); toast('已清零', 'ok'); } }),
+      el('span', { style: 'flex:1' })));
 
     b.append(Form.sect('护栏（L3）'));
+    b.append(Form.toggle('关闭 token / 费用上限', '关掉后只保留「每轮工具调用次数」防死循环；适合本地模型或不在乎花费时', !!s.unlimited, (v) => { s.unlimited = v; this.save(); this.render(); }));
+    b.append(el('div', { class: 'hint', style: 'margin-bottom:6px' }, 'token 与费用按**每个会话**累计，新建会话自动归零；工具次数按**每一轮**计，避免单轮死循环。'));
     b.append(Form.field('token 上限', Form.num(s.maxTokens, (v) => { s.maxTokens = Math.max(1000, v); this.save(); }, { min: 1000, step: 1000 }), '输入+输出合计，超出即中止本轮'));
     b.append(Form.field('费用上限（元）', Form.num(s.maxCost, (v) => { s.maxCost = Math.max(0, v); this.save(); }, { min: 0, step: 0.1 })));
     b.append(Form.field('工具调用上限（次）', Form.num(s.maxToolCalls, (v) => { s.maxToolCalls = Math.max(1, v); this.save(); }, { min: 1 })));

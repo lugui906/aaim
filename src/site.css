@@ -1060,3 +1060,7 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
 }
 .msg.user .attach.files .a .achars{color:var(--text-placeholder);flex:0 0 auto}
 .msg.user .msg-tools{margin-top:8px}
+
+/* 预算护栏提示：用警告色而非错误色，避免看起来像崩溃 */
+.errbox.warnbox{border-color:rgba(184,121,26,.32);background:rgba(184,121,26,.05)}
+.errbox.warnbox .errhd{color:var(--warn)}

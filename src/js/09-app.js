@@ -248,6 +248,31 @@ const App = {
         this.setRunning(false);
         const t = UI.turn;
         const msg = (e && e.message) || String(e);
+        // 预算触顶：给「继续执行」，而不是让用户以为程序坏了
+        if (e && e.budget) {
+          const node = el('div', { class: 'msg agent' }, el('div', { class: 'body' },
+            el('div', { class: 'errbox warnbox' },
+              el('div', { class: 'errhd', text: '预算护栏触发' }),
+              el('div', { class: 'errmsg', text: msg }),
+              el('div', { class: 'errhint', text: e.budget.reset
+                ? '这是为了防止一次对话花太多钱。点「继续执行」会清零本会话统计后接着做，也可以在 设置 → 预算 里调高或关掉限制。'
+                : '单轮工具调用过多会被拦下，避免死循环。点「继续执行」会接着再跑一轮。' }),
+              el('div', { class: 'acts' },
+                el('button', { class: 'btn sm primary', text: '继续执行', onclick: () => {
+                  Agent.resetBudget();
+                  node.remove();
+                  Agent.regenerate();
+                } }),
+                el('button', { class: 'btn sm', text: '调高上限', onclick: () => Drawer.open('budget') }),
+                el('button', { class: 'btn sm ghost', text: '关闭护栏', onclick: () => {
+                  State.settings.budget.unlimited = true; State.saveSettings();
+                  toast('已关闭 token / 费用上限（工具次数防死循环仍保留）', 'ok');
+                  Drawer.render();
+                } })))));
+          if (t && t.node.parentNode) t.node.replaceWith(node); else $('#messages').append(node);
+          scrollBottom(true);
+          return;
+        }
         let hint = '';
         if (/Failed to fetch|NetworkError|load failed/i.test(msg)) hint = '常见原因：① 浏览器 CORS 拦截（设置 → 模型 填代理地址）② Base URL 写错 ③ file:// 下部分浏览器限制请求。';
         else if (/401|403/.test(msg)) hint = 'Key 无效或无权限。';

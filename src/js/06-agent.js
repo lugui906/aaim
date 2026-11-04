@@ -31,21 +31,40 @@ const Agent = {
     return sys.concat(flat);
   },
 
-  /* ---- 预算护栏（L3） ---- */
-  budgetLeft() {
-    const b = State.settings.budget, u = State.usage;
-    return {
-      tokens: Math.max(0, b.maxTokens - (u.inTok + u.outTok)),
-      cost: Math.max(0, b.maxCost - u.cost),
-      tools: Math.max(0, b.maxToolCalls - u.toolCalls)
-    };
+  /* ---- 预算护栏（L3）
+     作用域要分清：
+       · 工具调用次数 = 每轮上限（防止单轮死循环）
+       · token / 费用 = 每个会话累计（防止一轮对话花太多）
+     这些都必须可重置，否则攒满后每一轮都会立刻失败，表现为「输出无故停止」。 */
+  turnTools: 0,
+  spendOf() {
+    const s = State.current();
+    if (!s.spend) s.spend = { tok: 0, cost: 0 };
+    return s.spend;
   },
   budgetExceeded() {
-    const l = this.budgetLeft();
-    if (l.tokens <= 0) return '本轮会话 token 预算已用尽（' + State.settings.budget.maxTokens + '）';
-    if (l.cost <= 0) return '本轮会话费用预算已用尽（¥' + State.settings.budget.maxCost + '）';
-    if (l.tools <= 0) return '本轮工具调用次数已达上限（' + State.settings.budget.maxToolCalls + ' 次）';
+    const b = State.settings.budget || {};
+    const maxTools = Number(b.maxToolCalls) || 40;
+    const maxTok = Number(b.maxTokens) || 200000;
+    const maxCost = Number(b.maxCost);
+    const sp = this.spendOf();
+    if (this.turnTools >= maxTools) {
+      return { kind: 'tools', msg: `本轮工具调用已达 ${maxTools} 次上限（防死循环）`, reset: false };
+    }
+    if (!b.unlimited && sp.tok >= maxTok) {
+      return { kind: 'tokens', msg: `本会话已用 ${sp.tok} token，达到上限 ${maxTok}`, reset: true };
+    }
+    if (!b.unlimited && isFinite(maxCost) && maxCost > 0 && sp.cost >= maxCost) {
+      return { kind: 'cost', msg: `本会话估算费用 ¥${sp.cost.toFixed(3)}，达到上限 ¥${maxCost}`, reset: true };
+    }
     return null;
+  },
+  /** 清零本会话消耗；工具次数是每轮自动清零的 */
+  resetBudget() {
+    const s = State.current();
+    s.spend = { tok: 0, cost: 0 };
+    this.turnTools = 0;
+    State.saveSessions();
   },
 
   /* ---- 入队（E1：串行） ---- */
@@ -75,6 +94,7 @@ const Agent = {
     const session = State.current();
     const s = State.settings;
     this.stopFlag = false;
+    this.turnTools = 0;          // 每轮重置，只用于防单轮死循环
     const turnStart = performance.now();
     // 用户消息
     const userMsg = {
@@ -98,7 +118,11 @@ const Agent = {
       while (step < maxSteps) {
         step++;
         const over = this.budgetExceeded();
-        if (over) throw new Error(over + '。可在 设置 → 预算 里调高上限。');
+        if (over) {
+          const e = new Error(over.msg);
+          e.budget = over;       // 让 onError 渲染「继续（重置预算）」而不是直接死掉
+          throw e;
+        }
         if (this.stopFlag) break;
         const ctx = this.trim([{ role: 'system', content: buildSystemPrompt() }, ...session.messages.filter((m) => m.role !== 'system')], Number(s.contextLimit) || 24000, Number(s.keepRecent) || 6);
         State.abort = new AbortController();
@@ -123,6 +147,7 @@ const Agent = {
         const b = s.budget;
         const cost = (inTok / 1e6) * Number(b.priceIn || 0) + (outTok / 1e6) * Number(b.priceOut || 0);
         State.usage.inTok += inTok; State.usage.outTok += outTok; State.usage.calls++; State.usage.cost += cost;
+        { const sp = this.spendOf(); sp.tok += inTok + outTok; sp.cost += cost; }
         session.usage = session.usage || { inTok: 0, outTok: 0, calls: 0, toolCalls: 0, cost: 0 };
         session.usage.inTok += inTok; session.usage.outTok += outTok; session.usage.calls++; session.usage.cost += cost;
         this.hooks.onUsage && this.hooks.onUsage({ inTok, outTok, calls: 1, cost, step });
@@ -157,6 +182,7 @@ const Agent = {
             this.hooks.onToolStart && this.hooks.onToolStart(call);
             out = await Tools.exec(call.name, call.arguments, { session });
           }
+          this.turnTools++;
           session.usage.toolCalls = (session.usage.toolCalls || 0) + 1;
           const toolMsg = { role: 'tool', tool_call_id: call.id, name: call.name, content: Tools.toToolText(out), ts: Date.now(), display: out.display, ok: out.ok };
           session.messages.push(toolMsg);

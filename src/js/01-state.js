@@ -57,7 +57,7 @@ const DEFAULT_SETTINGS = {
   keepRecent: 6,              // 裁剪时保留的最近消息条数
   tts: { enabled: false, rate: 1, voice: '', maxChars: 280 },
   vision: true,
-  budget: { maxTokens: 200000, maxCost: 0.6, maxToolCalls: 40, priceIn: 2, priceOut: 8 }, // 元/百万 token 的估算单价
+  budget: { maxTokens: 200000, maxCost: 0.6, maxToolCalls: 40, priceIn: 2, priceOut: 8, unlimited: false }, // 元/百万 token 的估算单价
   search: {
     provider: 'deepseek',     // deepseek | tavily | serper | custom | none
     count: 8, needContent: true, searchType: 'web', enableSource: true,
@@ -114,7 +114,12 @@ const State = {
 };
 
 function newSession(title = '新会话') {
-  return { id: uid('s'), title, createdAt: Date.now(), updatedAt: Date.now(), messages: [], usage: { inTok: 0, outTok: 0, calls: 0, toolCalls: 0, cost: 0 }, pinned: false };
+  return {
+    id: uid('s'), title, createdAt: Date.now(), updatedAt: Date.now(), messages: [],
+    usage: { inTok: 0, outTok: 0, calls: 0, toolCalls: 0, cost: 0 },
+    spend: { tok: 0, cost: 0 },        // 本会话实际消耗（预算护栏用这个，不是全局累计）
+    pinned: false
+  };
 }
 
 function curProviderConf() { return State.settings.providers[State.settings.provider] || {}; }
