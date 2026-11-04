@@ -72,25 +72,162 @@ async function buildDocx(spec = {}) {
   return Packer.toBlob(doc);
 }
 
-/* ---------- Excel ---------- */
+/* ---------- Excel（ExcelJS：完整样式、边框、表头、列宽、冻结） ---------- */
 async function buildXlsx(spec = {}) {
-  await CDN.load('xlsx');
-  const XLSX = window.XLSX;
-  const wb = XLSX.utils.book_new();
-  const sheets = spec.sheets && spec.sheets.length ? spec.sheets : [{ name: 'Sheet1', headers: ['列1', '列2'], rows: [['a', 'b']] }];
+  await CDN.load('exceljs');
+  const ExcelJS = window.ExcelJS;
+  if (!ExcelJS) throw new Error('ExcelJS 未加载');
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = APP.name;
+  wb.created = new Date();
+
+  const sheets = (spec.sheets && spec.sheets.length)
+    ? spec.sheets
+    : [{ name: 'Sheet1', headers: ['列1', '列2'], rows: [['a', 'b']] }];
+
+  const theme = Object.assign({
+    headBg: 'FF162A4A',       // 表头深蓝
+    headFg: 'FFFFFFFF',
+    zebra: 'FFF4F7FB',        // 斑马纹
+    border: 'FFD8E0EC',
+    accent: 'FFF59E0B'
+  }, spec.theme || {});
+
+  const colName = (i) => {
+    let n = i + 1, s = '';
+    while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+    return s;
+  };
+
   for (const sh of sheets) {
-    let ws;
-    if (sh.aoa) ws = XLSX.utils.aoa_to_sheet(sh.aoa);
+    // 1) 归一化成二维数组
+    let aoa = [];
+    if (Array.isArray(sh.aoa) && sh.aoa.length) aoa = sh.aoa.map((r) => (Array.isArray(r) ? r : [r]));
     else {
-      const aoa = [];
-      if (sh.headers) aoa.push(sh.headers);
-      for (const r of sh.rows || []) aoa.push(Array.isArray(r) ? r : Object.values(r));
-      ws = XLSX.utils.aoa_to_sheet(aoa);
+      if (sh.headers && sh.headers.length) aoa.push(sh.headers.slice());
+      for (const r of sh.rows || []) aoa.push(Array.isArray(r) ? r.slice() : Object.values(r || {}));
     }
-    if (sh.colWidths) ws['!cols'] = sh.colWidths.map((w) => ({ wch: w }));
-    XLSX.utils.book_append_sheet(wb, ws, (sh.name || 'Sheet').slice(0, 30));
+    if (!aoa.length) aoa = [['（空表）']];
+
+    const ws = wb.addWorksheet(String(sh.name || 'Sheet').slice(0, 31), {
+      views: [{ state: 'frozen', ySplit: sh.headers ? 1 : 0 }],   // 表头冻结
+      properties: { defaultRowHeight: 20 }
+    });
+
+    const nCols = Math.max(...aoa.map((r) => r.length), 1);
+    const hasHeader = sh.headers && sh.headers.length > 0;
+
+    // 2) 写值 + 类型推断
+    aoa.forEach((row, ri) => {
+      const r = ws.getRow(ri + 1);
+      for (let ci = 0; ci < nCols; ci++) {
+        const raw = row[ci];
+        const c = r.getCell(ci + 1);
+        if (raw == null || raw === '') { c.value = null; continue; }
+        const s2 = String(raw);
+        // 纯数字（不含前导 0）写成数值，方便排序求和
+        if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(s2) && s2.length < 15) {
+          c.value = Number(s2);
+          c.numFmt = Number.isInteger(Number(s2)) ? '#,##0' : '#,##0.00';
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(s2)) {
+          // 必须用 UTC 构造：ExcelJS 序列化日期走 UTC 分量，用本地时间会整体偏一个时区
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s2);
+          c.value = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+          c.numFmt = 'yyyy-mm-dd';
+        } else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(s2)) {
+          const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s2);
+          c.value = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
+          c.numFmt = 'yyyy-mm-dd hh:mm';
+        } else {
+          c.value = s2;
+        }
+      }
+      r.commit();
+    });
+
+    // 3) 统一边框 + 斑马纹 + 对齐
+    for (let ri = 0; ri < aoa.length; ri++) {
+      const r = ws.getRow(ri + 1);
+      r.height = 20;
+      for (let ci = 0; ci < nCols; ci++) {
+        const c = r.getCell(ci + 1);
+        c.border = {
+          top: { style: 'thin', color: { argb: theme.border } },
+          left: { style: 'thin', color: { argb: theme.border } },
+          bottom: { style: 'thin', color: { argb: theme.border } },
+          right: { style: 'thin', color: { argb: theme.border } }
+        };
+        c.alignment = {
+          vertical: 'middle',
+          horizontal: typeof c.value === 'number' ? 'right' : (hasHeader && ri === 0 ? 'center' : 'left'),
+          wrapText: String(c.value == null ? '' : c.value).length > 40
+        };
+        if (hasHeader && ri === 0) {
+          c.font = { bold: true, color: { argb: theme.headFg }, size: 11, name: 'Microsoft YaHei' };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.headBg } };
+        } else {
+          c.font = { size: 11, name: 'Microsoft YaHei', color: { argb: 'FF1E232C' } };
+          if (ri % 2 === 0) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.zebra } };
+        }
+      }
+      r.commit();
+    }
+
+    // 4) 列宽：按内容长度自适应（中文按 2 个字符宽）
+    const widths = [];
+    for (let ci = 0; ci < nCols; ci++) {
+      let maxLen = 8;
+      for (const row of aoa) {
+        const v = row[ci];
+        if (v == null) continue;
+        const str = String(v);
+        let len = 0;
+        for (const ch of str) len += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(ch) ? 2 : 1;
+        maxLen = Math.max(maxLen, len);
+      }
+      widths.push(Math.min(46, maxLen + 4));
+    }
+    // 用户指定优先
+    if (Array.isArray(sh.colWidths)) sh.colWidths.forEach((w, i) => { if (i < widths.length) widths[i] = w; });
+    widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    // 5) 表头加粗行高 + 自动筛选
+    if (hasHeader && aoa.length > 1) {
+      ws.getRow(1).height = 26;
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: aoa.length, column: nCols } };
+    }
+
+    // 6) 可选：末尾加合计行
+    if (sh.totalRow) {
+      const tr = ws.getRow(aoa.length + 1);
+      const label = typeof sh.totalRow === 'string' ? sh.totalRow : '合计';
+      tr.getCell(1).value = label;
+      for (let ci = 1; ci < nCols; ci++) {
+        const colVals = aoa.slice(1).map((r) => Number(r[ci])).filter((v) => isFinite(v));
+        if (colVals.length === aoa.length - 1 && colVals.length > 0) {
+          tr.getCell(ci + 1).value = colVals.reduce((a, b) => a + b, 0);
+          tr.getCell(ci + 1).numFmt = '#,##0';
+        }
+      }
+      tr.height = 22;
+      tr.commit();
+      for (let ci = 0; ci < nCols; ci++) {
+        const c = tr.getCell(ci + 1);
+        c.font = { bold: true, size: 11, name: 'Microsoft YaHei', color: { argb: 'FF162A4A' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF7' } };
+        c.border = {
+          top: { style: 'medium', color: { argb: theme.headBg } },
+          left: { style: 'thin', color: { argb: theme.border } },
+          bottom: { style: 'thin', color: { argb: theme.border } },
+          right: { style: 'thin', color: { argb: theme.border } }
+        };
+        c.alignment = { vertical: 'middle', horizontal: typeof c.value === 'number' ? 'right' : 'left' };
+      }
+    }
   }
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true });
+
+  const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], { type: MIME.xlsx });
 }
 

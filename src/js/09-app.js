@@ -430,6 +430,8 @@ const App = {
       toast('当前是内置演示模型（无需 Key）。要接真模型：右上角 ⚙ → 模型', '', 6000);
     }
     $('#prompt').focus();
+    // 后台清理过期产物（14 天 / 最多 80 个），避免 IndexedDB 无限增长
+    setTimeout(() => { if (typeof ArtifactStore !== 'undefined') ArtifactStore.prune().catch(() => { }); }, 3000);
     console.log('[Aaim Agent] ready', APP.version, '工具数', Tools.active().length);
   },
 

@@ -259,7 +259,7 @@ Tools.register({
     let name = safeName(args.title || '幻灯片', 'slides');
     if (!/\.html?$/i.test(name)) name += '.html';
     const art = addArtifact({ name, mime: MIME.html, size: blob.size, blob, kind: 'reveal' });
-    return { ok: true, summary: `已生成 ${slides.length} 页网页幻灯片《${name}》`, data: { filename: name, pages: slides.length }, display: { kind: 'fileframe', art, html: '' , previewUrl: URL.createObjectURL(blob) } };
+    return { ok: true, summary: `已生成 ${slides.length} 页网页幻灯片《${name}》`, data: { filename: name, pages: slides.length }, display: { kind: 'fileframe', art, html: '' } };
   }
 });
 

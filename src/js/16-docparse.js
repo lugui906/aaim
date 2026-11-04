@@ -158,7 +158,7 @@ const DocParser = {
     let wb;
     const buf = await blob.arrayBuffer();
     try {
-      wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true, raw: false });
+      wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true, raw: true });
     } catch (e) {
       throw new Error('表格解析失败：' + e.message + '（若是 .xls 且带密码，请先另存为 .xlsx）');
     }
@@ -169,8 +169,22 @@ const DocParser = {
       const ws = wb.Sheets[sn];
       if (!ws) continue;
       let rows;
-      try { rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '', raw: false }); }
+      try { rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '', raw: true }); }
       catch { continue; }
+      // 统一成可读字符串：日期用 YYYY-MM-DD，数字保持干净（不带千分位，方便计算）
+      const fmtCell = (v) => {
+        if (v == null) return '';
+        if (v instanceof Date && !isNaN(v)) {
+          const p2 = (n) => String(n).padStart(2, '0');
+          // 用本地分量：sheetjs 把 Excel 日期序列号按本地时区还原成 Date，用 UTC 分量会整体偏一个时区
+          const hasTime = v.getHours() || v.getMinutes() || v.getSeconds();
+          return `${v.getFullYear()}-${p2(v.getMonth() + 1)}-${p2(v.getDate())}` + (hasTime ? ` ${p2(v.getHours())}:${p2(v.getMinutes())}` : '');
+        }
+        if (typeof v === 'number') return String(v);
+        if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+        return String(v);
+      };
+      rows = rows.map((r) => (Array.isArray(r) ? r.map(fmtCell) : [fmtCell(r)]));
       if (!rows || !rows.length) { out.push(`## 工作表：${sn}\n（空）\n`); continue; }
       const cols = Math.min(30, Math.max(...rows.map((r) => r.length)));
       const cap = rows.slice(0, 300).map((r) => {

@@ -1,6 +1,5 @@
-# 测试用浏览器 profile（体积大）
 .*-profile/
-# 截图（需要时本地保留即可）
 shots/
+.dl*/
 node_modules/
 .DS_Store

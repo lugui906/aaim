@@ -1064,3 +1064,7 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
 /* 预算护栏提示：用警告色而非错误色，避免看起来像崩溃 */
 .errbox.warnbox{border-color:rgba(184,121,26,.32);background:rgba(184,121,26,.05)}
 .errbox.warnbox .errhd{color:var(--warn)}
+
+/* 产物按钮：点击中的反馈 */
+.artbtn.busy{opacity:.5;cursor:progress}
+.artbtn:disabled{cursor:progress}

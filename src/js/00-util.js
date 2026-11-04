@@ -185,6 +185,12 @@ const CDN = {
       'https://registry.npmmirror.com/mermaid/10.9.1/files/dist/mermaid.min.js',
       'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js'
     ],
+    exceljs: [
+      'https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js',
+      'https://cdn.bootcdn.net/ajax/libs/exceljs/4.4.0/exceljs.min.js',
+      'https://registry.npmmirror.com/exceljs/4.4.0/files/dist/exceljs.min.js',
+      'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'
+    ],
     jszip: [
       'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js',
       'https://cdn.bootcdn.net/ajax/libs/jszip/3.10.1/jszip.min.js',

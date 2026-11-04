@@ -1,6 +1,15 @@
 /* ============ 03 工具注册表 + 搜索 / 抓取 / 沙箱 ============ */
 const Artifacts = [];   // 生成的文件/图表等，供 UI 下载
-function addArtifact(a) { a.id = uid('art'); Artifacts.unshift(a); if (Artifacts.length > 60) Artifacts.pop(); return a; }
+function addArtifact(a) {
+  a.id = uid('art');
+  Artifacts.unshift(a);
+  if (Artifacts.length > 60) Artifacts.pop();
+  // 关键：把字节存进 IndexedDB，否则刷新后会话里的 blob 会被 JSON 擦成空对象，下载就成空文件
+  if (typeof ArtifactStore !== 'undefined' && a.blob instanceof Blob) {
+    ArtifactStore.put(a).catch(() => {});
+  }
+  return a;
+}
 
 const Tools = {
   reg: new Map(),

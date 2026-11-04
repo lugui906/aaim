@@ -1073,6 +1073,10 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
 /* 预算护栏提示：用警告色而非错误色，避免看起来像崩溃 */
 .errbox.warnbox{border-color:rgba(184,121,26,.32);background:rgba(184,121,26,.05)}
 .errbox.warnbox .errhd{color:var(--warn)}
+
+/* 产物按钮：点击中的反馈 */
+.artbtn.busy{opacity:.5;cursor:progress}
+.artbtn:disabled{cursor:progress}
 </style>
 </head>
 <body>
@@ -1347,6 +1351,12 @@ const CDN = {
       'https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js',
       'https://registry.npmmirror.com/mermaid/10.9.1/files/dist/mermaid.min.js',
       'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js'
+    ],
+    exceljs: [
+      'https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js',
+      'https://cdn.bootcdn.net/ajax/libs/exceljs/4.4.0/exceljs.min.js',
+      'https://registry.npmmirror.com/exceljs/4.4.0/files/dist/exceljs.min.js',
+      'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'
     ],
     jszip: [
       'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js',
@@ -1912,7 +1922,16 @@ const MockLLM = {
 /* ===== 03-tools.js ===== */
 /* ============ 03 工具注册表 + 搜索 / 抓取 / 沙箱 ============ */
 const Artifacts = [];   // 生成的文件/图表等，供 UI 下载
-function addArtifact(a) { a.id = uid('art'); Artifacts.unshift(a); if (Artifacts.length > 60) Artifacts.pop(); return a; }
+function addArtifact(a) {
+  a.id = uid('art');
+  Artifacts.unshift(a);
+  if (Artifacts.length > 60) Artifacts.pop();
+  // 关键：把字节存进 IndexedDB，否则刷新后会话里的 blob 会被 JSON 擦成空对象，下载就成空文件
+  if (typeof ArtifactStore !== 'undefined' && a.blob instanceof Blob) {
+    ArtifactStore.put(a).catch(() => {});
+  }
+  return a;
+}
 
 const Tools = {
   reg: new Map(),
@@ -2336,25 +2355,162 @@ async function buildDocx(spec = {}) {
   return Packer.toBlob(doc);
 }
 
-/* ---------- Excel ---------- */
+/* ---------- Excel（ExcelJS：完整样式、边框、表头、列宽、冻结） ---------- */
 async function buildXlsx(spec = {}) {
-  await CDN.load('xlsx');
-  const XLSX = window.XLSX;
-  const wb = XLSX.utils.book_new();
-  const sheets = spec.sheets && spec.sheets.length ? spec.sheets : [{ name: 'Sheet1', headers: ['列1', '列2'], rows: [['a', 'b']] }];
+  await CDN.load('exceljs');
+  const ExcelJS = window.ExcelJS;
+  if (!ExcelJS) throw new Error('ExcelJS 未加载');
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = APP.name;
+  wb.created = new Date();
+
+  const sheets = (spec.sheets && spec.sheets.length)
+    ? spec.sheets
+    : [{ name: 'Sheet1', headers: ['列1', '列2'], rows: [['a', 'b']] }];
+
+  const theme = Object.assign({
+    headBg: 'FF162A4A',       // 表头深蓝
+    headFg: 'FFFFFFFF',
+    zebra: 'FFF4F7FB',        // 斑马纹
+    border: 'FFD8E0EC',
+    accent: 'FFF59E0B'
+  }, spec.theme || {});
+
+  const colName = (i) => {
+    let n = i + 1, s = '';
+    while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+    return s;
+  };
+
   for (const sh of sheets) {
-    let ws;
-    if (sh.aoa) ws = XLSX.utils.aoa_to_sheet(sh.aoa);
+    // 1) 归一化成二维数组
+    let aoa = [];
+    if (Array.isArray(sh.aoa) && sh.aoa.length) aoa = sh.aoa.map((r) => (Array.isArray(r) ? r : [r]));
     else {
-      const aoa = [];
-      if (sh.headers) aoa.push(sh.headers);
-      for (const r of sh.rows || []) aoa.push(Array.isArray(r) ? r : Object.values(r));
-      ws = XLSX.utils.aoa_to_sheet(aoa);
+      if (sh.headers && sh.headers.length) aoa.push(sh.headers.slice());
+      for (const r of sh.rows || []) aoa.push(Array.isArray(r) ? r.slice() : Object.values(r || {}));
     }
-    if (sh.colWidths) ws['!cols'] = sh.colWidths.map((w) => ({ wch: w }));
-    XLSX.utils.book_append_sheet(wb, ws, (sh.name || 'Sheet').slice(0, 30));
+    if (!aoa.length) aoa = [['（空表）']];
+
+    const ws = wb.addWorksheet(String(sh.name || 'Sheet').slice(0, 31), {
+      views: [{ state: 'frozen', ySplit: sh.headers ? 1 : 0 }],   // 表头冻结
+      properties: { defaultRowHeight: 20 }
+    });
+
+    const nCols = Math.max(...aoa.map((r) => r.length), 1);
+    const hasHeader = sh.headers && sh.headers.length > 0;
+
+    // 2) 写值 + 类型推断
+    aoa.forEach((row, ri) => {
+      const r = ws.getRow(ri + 1);
+      for (let ci = 0; ci < nCols; ci++) {
+        const raw = row[ci];
+        const c = r.getCell(ci + 1);
+        if (raw == null || raw === '') { c.value = null; continue; }
+        const s2 = String(raw);
+        // 纯数字（不含前导 0）写成数值，方便排序求和
+        if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(s2) && s2.length < 15) {
+          c.value = Number(s2);
+          c.numFmt = Number.isInteger(Number(s2)) ? '#,##0' : '#,##0.00';
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(s2)) {
+          // 必须用 UTC 构造：ExcelJS 序列化日期走 UTC 分量，用本地时间会整体偏一个时区
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s2);
+          c.value = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+          c.numFmt = 'yyyy-mm-dd';
+        } else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(s2)) {
+          const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s2);
+          c.value = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
+          c.numFmt = 'yyyy-mm-dd hh:mm';
+        } else {
+          c.value = s2;
+        }
+      }
+      r.commit();
+    });
+
+    // 3) 统一边框 + 斑马纹 + 对齐
+    for (let ri = 0; ri < aoa.length; ri++) {
+      const r = ws.getRow(ri + 1);
+      r.height = 20;
+      for (let ci = 0; ci < nCols; ci++) {
+        const c = r.getCell(ci + 1);
+        c.border = {
+          top: { style: 'thin', color: { argb: theme.border } },
+          left: { style: 'thin', color: { argb: theme.border } },
+          bottom: { style: 'thin', color: { argb: theme.border } },
+          right: { style: 'thin', color: { argb: theme.border } }
+        };
+        c.alignment = {
+          vertical: 'middle',
+          horizontal: typeof c.value === 'number' ? 'right' : (hasHeader && ri === 0 ? 'center' : 'left'),
+          wrapText: String(c.value == null ? '' : c.value).length > 40
+        };
+        if (hasHeader && ri === 0) {
+          c.font = { bold: true, color: { argb: theme.headFg }, size: 11, name: 'Microsoft YaHei' };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.headBg } };
+        } else {
+          c.font = { size: 11, name: 'Microsoft YaHei', color: { argb: 'FF1E232C' } };
+          if (ri % 2 === 0) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.zebra } };
+        }
+      }
+      r.commit();
+    }
+
+    // 4) 列宽：按内容长度自适应（中文按 2 个字符宽）
+    const widths = [];
+    for (let ci = 0; ci < nCols; ci++) {
+      let maxLen = 8;
+      for (const row of aoa) {
+        const v = row[ci];
+        if (v == null) continue;
+        const str = String(v);
+        let len = 0;
+        for (const ch of str) len += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(ch) ? 2 : 1;
+        maxLen = Math.max(maxLen, len);
+      }
+      widths.push(Math.min(46, maxLen + 4));
+    }
+    // 用户指定优先
+    if (Array.isArray(sh.colWidths)) sh.colWidths.forEach((w, i) => { if (i < widths.length) widths[i] = w; });
+    widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    // 5) 表头加粗行高 + 自动筛选
+    if (hasHeader && aoa.length > 1) {
+      ws.getRow(1).height = 26;
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: aoa.length, column: nCols } };
+    }
+
+    // 6) 可选：末尾加合计行
+    if (sh.totalRow) {
+      const tr = ws.getRow(aoa.length + 1);
+      const label = typeof sh.totalRow === 'string' ? sh.totalRow : '合计';
+      tr.getCell(1).value = label;
+      for (let ci = 1; ci < nCols; ci++) {
+        const colVals = aoa.slice(1).map((r) => Number(r[ci])).filter((v) => isFinite(v));
+        if (colVals.length === aoa.length - 1 && colVals.length > 0) {
+          tr.getCell(ci + 1).value = colVals.reduce((a, b) => a + b, 0);
+          tr.getCell(ci + 1).numFmt = '#,##0';
+        }
+      }
+      tr.height = 22;
+      tr.commit();
+      for (let ci = 0; ci < nCols; ci++) {
+        const c = tr.getCell(ci + 1);
+        c.font = { bold: true, size: 11, name: 'Microsoft YaHei', color: { argb: 'FF162A4A' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF7' } };
+        c.border = {
+          top: { style: 'medium', color: { argb: theme.headBg } },
+          left: { style: 'thin', color: { argb: theme.border } },
+          bottom: { style: 'thin', color: { argb: theme.border } },
+          right: { style: 'thin', color: { argb: theme.border } }
+        };
+        c.alignment = { vertical: 'middle', horizontal: typeof c.value === 'number' ? 'right' : 'left' };
+      }
+    }
   }
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true });
+
+  const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], { type: MIME.xlsx });
 }
 
@@ -3026,7 +3182,7 @@ Tools.register({
     let name = safeName(args.title || '幻灯片', 'slides');
     if (!/\.html?$/i.test(name)) name += '.html';
     const art = addArtifact({ name, mime: MIME.html, size: blob.size, blob, kind: 'reveal' });
-    return { ok: true, summary: `已生成 ${slides.length} 页网页幻灯片《${name}》`, data: { filename: name, pages: slides.length }, display: { kind: 'fileframe', art, html: '' , previewUrl: URL.createObjectURL(blob) } };
+    return { ok: true, summary: `已生成 ${slides.length} 页网页幻灯片《${name}》`, data: { filename: name, pages: slides.length }, display: { kind: 'fileframe', art, html: '' } };
   }
 });
 
@@ -3832,8 +3988,8 @@ const UI = {
         el('div', { class: 'artmeta' },
           el('span', { class: 'artname', text: a.name, title: a.name }),
           el('span', { class: 'artsize', text: fmtBytes(a.size) })),
-        el('button', { class: 'artbtn', title: '下载', html: Icons.download(14), onclick: () => downloadBlob(a.blob, a.name) }),
-        a.mime === MIME.html ? el('button', { class: 'artbtn', title: '在新窗口打开', html: Icons.external(14), onclick: () => window.open(URL.createObjectURL(a.blob), '_blank', 'noopener') }) : null));
+        el('button', { class: 'artbtn', title: '下载', html: Icons.download(14), onclick: (e) => this.clickArtifactBtn(e, () => downloadArtifact(a)) }),
+        a.mime === MIME.html ? el('button', { class: 'artbtn', title: '在新窗口打开', html: Icons.external(14), onclick: (e) => this.clickArtifactBtn(e, () => openArtifact(a)) }) : null));
     }
     return bar;
   },
@@ -3904,9 +4060,22 @@ const UI = {
       holder.style.background = d.themeDark ? '#111' : '';
       card.append(holder);
       const html = d.html || (d.art ? '' : '');
-      if (d.previewUrl) {
-        holder.append(el('div', { class: 'bar' }, el('span', { text: '幻灯片预览（需联网加载 reveal.js）' })));
-        holder.append(el('iframe', { sandbox: 'allow-scripts allow-popups', src: d.previewUrl, style: 'height:420px' }));
+      if (d.previewUrl || d.art) {
+        const bar = el('div', { class: 'bar' }, el('span', { text: '幻灯片预览（需联网加载 reveal.js）' }));
+        holder.append(bar);
+        const slot = el('div');
+        holder.append(slot);
+        const mount = async () => {
+          let url = d.previewUrl;
+          if (!url && d.art) {
+            const blob = await resolveArtifactBlob(d.art);
+            if (!blob) { slot.append(el('div', { class: 'hint', style: 'padding:16px', text: '预览不可用：文件内容已不在本地，请重新生成或直接下载。' })); return; }
+            url = URL.createObjectURL(blob);
+          }
+          slot.innerHTML = '';
+          slot.append(el('iframe', { sandbox: 'allow-scripts allow-popups', src: url, style: 'height:420px' }));
+        };
+        mount();
       } else {
         holder.append(el('div', { class: 'bar' }, el('span', { text: '沙箱内渲染 · 交互事件会回传给 Agent' })));
         Sandbox.renderHTML(holder, html, { height: d.height || 380, title: d.title });
@@ -4032,14 +4201,23 @@ const UI = {
     return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: (m && m.name) || '工具结果' }));
   },
 
+  /** 产物按钮统一入口：点击时给视觉反馈，避免「点了没反应」 */
+  async clickArtifactBtn(e, fn) {
+    const btn = e && e.currentTarget;
+    if (btn) { btn.classList.add('busy'); btn.disabled = true; }
+    try { await fn(); }
+    catch (err) { toast('操作失败：' + (err && err.message || err), 'err', 5000); }
+    finally { if (btn) { btn.classList.remove('busy'); btn.disabled = false; } }
+  },
+
   artifactNode(art) {
     return el('div', { class: 'attach', style: 'margin:4px 0' },
       el('span', { class: 'a', style: 'font-size:12.5px' },
         el('span', { class: 'artico', html: fileIcon(art.kind, 15) }),
         el('b', { text: art.name }),
         el('span', { style: 'color:var(--text-placeholder)', text: fmtBytes(art.size) })),
-      el('button', { class: 'btn sm', html: Icons.download(13) + '<span>下载</span>', onclick: () => downloadBlob(art.blob, art.name) }),
-      art.mime === MIME.html ? el('button', { class: 'btn sm ghost', html: Icons.external(13) + '<span>新窗口打开</span>', onclick: () => window.open(URL.createObjectURL(art.blob), '_blank', 'noopener') }) : null);
+      el('button', { class: 'btn sm', html: Icons.download(13) + '<span>下载</span>', onclick: (e) => this.clickArtifactBtn(e, () => downloadArtifact(art)) }),
+      art.mime === MIME.html ? el('button', { class: 'btn sm ghost', html: Icons.external(13) + '<span>新窗口打开</span>', onclick: (e) => this.clickArtifactBtn(e, () => openArtifact(art)) }) : null);
   },
 
   exportChart(card) {
@@ -4505,6 +4683,8 @@ const App = {
       toast('当前是内置演示模型（无需 Key）。要接真模型：右上角 ⚙ → 模型', '', 6000);
     }
     $('#prompt').focus();
+    // 后台清理过期产物（14 天 / 最多 80 个），避免 IndexedDB 无限增长
+    setTimeout(() => { if (typeof ArtifactStore !== 'undefined') ArtifactStore.prune().catch(() => { }); }, 3000);
     console.log('[Aaim Agent] ready', APP.version, '工具数', Tools.active().length);
   },
 
@@ -5783,7 +5963,7 @@ const DocParser = {
     let wb;
     const buf = await blob.arrayBuffer();
     try {
-      wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true, raw: false });
+      wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true, raw: true });
     } catch (e) {
       throw new Error('表格解析失败：' + e.message + '（若是 .xls 且带密码，请先另存为 .xlsx）');
     }
@@ -5794,8 +5974,22 @@ const DocParser = {
       const ws = wb.Sheets[sn];
       if (!ws) continue;
       let rows;
-      try { rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '', raw: false }); }
+      try { rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '', raw: true }); }
       catch { continue; }
+      // 统一成可读字符串：日期用 YYYY-MM-DD，数字保持干净（不带千分位，方便计算）
+      const fmtCell = (v) => {
+        if (v == null) return '';
+        if (v instanceof Date && !isNaN(v)) {
+          const p2 = (n) => String(n).padStart(2, '0');
+          // 用本地分量：sheetjs 把 Excel 日期序列号按本地时区还原成 Date，用 UTC 分量会整体偏一个时区
+          const hasTime = v.getHours() || v.getMinutes() || v.getSeconds();
+          return `${v.getFullYear()}-${p2(v.getMonth() + 1)}-${p2(v.getDate())}` + (hasTime ? ` ${p2(v.getHours())}:${p2(v.getMinutes())}` : '');
+        }
+        if (typeof v === 'number') return String(v);
+        if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+        return String(v);
+      };
+      rows = rows.map((r) => (Array.isArray(r) ? r.map(fmtCell) : [fmtCell(r)]));
       if (!rows || !rows.length) { out.push(`## 工作表：${sn}\n（空）\n`); continue; }
       const cols = Math.min(30, Math.max(...rows.map((r) => r.length)));
       const cap = rows.slice(0, 300).map((r) => {
@@ -5925,6 +6119,172 @@ async function readPdfBlob(file) {
   const text = out.trim();
   if (!text) throw new Error('这个 PDF 没有可提取的文字（可能是扫描件，需要 OCR）');
   return text;
+}
+
+/* ===== 17-artifacts.js ===== */
+/* ============ 17 产物持久化：IndexedDB 存字节，刷新后仍可下载 ============ */
+/* 背景：会话消息存 localStorage，Blob 无法序列化，刷新后 art.blob 会变成空对象，
+   点下载就什么都不发生。这里把产物的字节单独存进 IndexedDB，按 id 取回。 */
+const ArtifactStore = {
+  DB: 'aaim-artifacts',
+  VER: 1,
+  STORE: 'files',
+  _db: null,
+
+  open() {
+    if (this._db) return Promise.resolve(this._db);
+    if (typeof indexedDB === 'undefined') return Promise.reject(new Error('浏览器不支持 IndexedDB'));
+    return new Promise((res, rej) => {
+      let req;
+      try { req = indexedDB.open(this.DB, this.VER); }
+      catch (e) { return rej(e); }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(this.STORE)) {
+          const os = db.createObjectStore(this.STORE, { keyPath: 'id' });
+          os.createIndex('ts', 'ts');
+        }
+      };
+      req.onsuccess = () => { this._db = req.result; res(this._db); };
+      req.onerror = () => rej(req.error || new Error('IndexedDB 打开失败'));
+      req.onblocked = () => rej(new Error('IndexedDB 被其它标签页占用'));
+    });
+  },
+
+  async _tx(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(this.STORE, mode);
+      let out;
+      try { out = fn(tx.objectStore(this.STORE)); } catch (e) { return rej(e); }
+      tx.oncomplete = () => res(out && out.__req ? out.__req.result : out);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error || new Error('事务中断'));
+    });
+  },
+
+  /** 存一个产物（art: {id,name,mime,size,kind,blob}） */
+  async put(art) {
+    try {
+      if (!art || !art.id) return false;
+      const blob = art.blob;
+      if (!(blob instanceof Blob)) return false;
+      const buf = await blob.arrayBuffer();
+      await this._tx('readwrite', (os) => os.put({
+        id: art.id, name: art.name, mime: art.mime, size: art.size,
+        kind: art.kind, ts: Date.now(), buf
+      }));
+      return true;
+    } catch (e) {
+      console.warn('[ArtifactStore] 保存失败', art && art.name, e);
+      return false;
+    }
+  },
+
+  /** 按 id 取回 Blob（找不到返回 null） */
+  async get(id) {
+    try {
+      const db = await this.open();
+      const rec = await new Promise((res, rej) => {
+        const tx = db.transaction(this.STORE, 'readonly');
+        const rq = tx.objectStore(this.STORE).get(id);
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => rej(rq.error);
+      });
+      if (!rec || !rec.buf) return null;
+      return new Blob([rec.buf], { type: rec.mime || 'application/octet-stream' });
+    } catch (e) {
+      console.warn('[ArtifactStore] 读取失败', id, e);
+      return null;
+    }
+  },
+
+  async has(id) {
+    try {
+      const db = await this.open();
+      const n = await new Promise((res, rej) => {
+        const tx = db.transaction(this.STORE, 'readonly');
+        const rq = tx.objectStore(this.STORE).count(id);
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => rej(rq.error);
+      });
+      return n > 0;
+    } catch { return false; }
+  },
+
+  async del(id) { try { await this._tx('readwrite', (os) => os.delete(id)); } catch { } },
+  async clear() { try { await this._tx('readwrite', (os) => os.clear()); } catch { } },
+
+  async list() {
+    try {
+      const db = await this.open();
+      return await new Promise((res, rej) => {
+        const tx = db.transaction(this.STORE, 'readonly');
+        const rq = tx.objectStore(this.STORE).getAll();
+        rq.onsuccess = () => res((rq.result || []).map((r) => ({ id: r.id, name: r.name, size: r.size, kind: r.kind, ts: r.ts })));
+        rq.onerror = () => rej(rq.error);
+      });
+    } catch { return []; }
+  },
+
+  /** 清理：超过 maxAge 天的，或总量超过 maxCount 个的旧记录 */
+  async prune({ maxAge = 14 * 864e5, maxCount = 80 } = {}) {
+    try {
+      const all = await this.list();
+      if (!all.length) return 0;
+      const now = Date.now();
+      const old = all.filter((r) => now - (r.ts || 0) > maxAge);
+      const sorted = all.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      const over = sorted.slice(maxCount);
+      const kill = new Set([...old, ...over].map((r) => r.id));
+      for (const id of kill) await this.del(id);
+      return kill.size;
+    } catch { return 0; }
+  }
+};
+
+/** 把产物解析成可用的 Blob：内存里有效就直接用，否则回 IndexedDB 取 */
+async function resolveArtifactBlob(art) {
+  if (!art) return null;
+  if (art.blob instanceof Blob) return art.blob;
+  if (!art.id) return null;
+  const b = await ArtifactStore.get(art.id);
+  if (b) art.blob = b;                 // 回填，下次直接用
+  return b;
+}
+
+/** 下载产物（异步解析，兼容刷新后的历史记录） */
+async function downloadArtifact(art) {
+  if (!art) return toast('找不到这个文件', 'err');
+  const t = (art.blob instanceof Blob) ? null : toast('正在从本地存储恢复文件…', '', 8000);
+  let blob = null;
+  try { blob = await resolveArtifactBlob(art); }
+  finally { if (t) t.remove(); }
+  if (!blob) {
+    toast(`「${art.name}」的原始内容已不在本地（只保留了文件名）。请让 Agent 重新生成一次。`, 'err', 6500);
+    return false;
+  }
+  downloadBlob(blob, art.name);
+  return true;
+}
+
+/** 在新窗口打开 HTML 类产物 */
+async function openArtifact(art) {
+  if (!art) return;
+  const t = (art.blob instanceof Blob) ? null : toast('正在恢复文件…', '', 8000);
+  let blob = null;
+  try { blob = await resolveArtifactBlob(art); }
+  finally { if (t) t.remove(); }
+  if (!blob) return toast(`「${art.name}」的内容已不在本地，请重新生成。`, 'err', 6000);
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank', 'noopener');
+  if (!w) toast('浏览器拦截了新窗口，请允许弹窗后重试', 'err');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/** 判断某个产物现在能不能下载（用于 UI 置灰） */
+function artifactReady(art) {
+  return !!(art && (art.blob instanceof Blob));
 }
 
 /* expose for debugging / automation */

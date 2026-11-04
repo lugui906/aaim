@@ -242,8 +242,8 @@ const UI = {
         el('div', { class: 'artmeta' },
           el('span', { class: 'artname', text: a.name, title: a.name }),
           el('span', { class: 'artsize', text: fmtBytes(a.size) })),
-        el('button', { class: 'artbtn', title: '下载', html: Icons.download(14), onclick: () => downloadBlob(a.blob, a.name) }),
-        a.mime === MIME.html ? el('button', { class: 'artbtn', title: '在新窗口打开', html: Icons.external(14), onclick: () => window.open(URL.createObjectURL(a.blob), '_blank', 'noopener') }) : null));
+        el('button', { class: 'artbtn', title: '下载', html: Icons.download(14), onclick: (e) => this.clickArtifactBtn(e, () => downloadArtifact(a)) }),
+        a.mime === MIME.html ? el('button', { class: 'artbtn', title: '在新窗口打开', html: Icons.external(14), onclick: (e) => this.clickArtifactBtn(e, () => openArtifact(a)) }) : null));
     }
     return bar;
   },
@@ -314,9 +314,22 @@ const UI = {
       holder.style.background = d.themeDark ? '#111' : '';
       card.append(holder);
       const html = d.html || (d.art ? '' : '');
-      if (d.previewUrl) {
-        holder.append(el('div', { class: 'bar' }, el('span', { text: '幻灯片预览（需联网加载 reveal.js）' })));
-        holder.append(el('iframe', { sandbox: 'allow-scripts allow-popups', src: d.previewUrl, style: 'height:420px' }));
+      if (d.previewUrl || d.art) {
+        const bar = el('div', { class: 'bar' }, el('span', { text: '幻灯片预览（需联网加载 reveal.js）' }));
+        holder.append(bar);
+        const slot = el('div');
+        holder.append(slot);
+        const mount = async () => {
+          let url = d.previewUrl;
+          if (!url && d.art) {
+            const blob = await resolveArtifactBlob(d.art);
+            if (!blob) { slot.append(el('div', { class: 'hint', style: 'padding:16px', text: '预览不可用：文件内容已不在本地，请重新生成或直接下载。' })); return; }
+            url = URL.createObjectURL(blob);
+          }
+          slot.innerHTML = '';
+          slot.append(el('iframe', { sandbox: 'allow-scripts allow-popups', src: url, style: 'height:420px' }));
+        };
+        mount();
       } else {
         holder.append(el('div', { class: 'bar' }, el('span', { text: '沙箱内渲染 · 交互事件会回传给 Agent' })));
         Sandbox.renderHTML(holder, html, { height: d.height || 380, title: d.title });
@@ -442,14 +455,23 @@ const UI = {
     return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: (m && m.name) || '工具结果' }));
   },
 
+  /** 产物按钮统一入口：点击时给视觉反馈，避免「点了没反应」 */
+  async clickArtifactBtn(e, fn) {
+    const btn = e && e.currentTarget;
+    if (btn) { btn.classList.add('busy'); btn.disabled = true; }
+    try { await fn(); }
+    catch (err) { toast('操作失败：' + (err && err.message || err), 'err', 5000); }
+    finally { if (btn) { btn.classList.remove('busy'); btn.disabled = false; } }
+  },
+
   artifactNode(art) {
     return el('div', { class: 'attach', style: 'margin:4px 0' },
       el('span', { class: 'a', style: 'font-size:12.5px' },
         el('span', { class: 'artico', html: fileIcon(art.kind, 15) }),
         el('b', { text: art.name }),
         el('span', { style: 'color:var(--text-placeholder)', text: fmtBytes(art.size) })),
-      el('button', { class: 'btn sm', html: Icons.download(13) + '<span>下载</span>', onclick: () => downloadBlob(art.blob, art.name) }),
-      art.mime === MIME.html ? el('button', { class: 'btn sm ghost', html: Icons.external(13) + '<span>新窗口打开</span>', onclick: () => window.open(URL.createObjectURL(art.blob), '_blank', 'noopener') }) : null);
+      el('button', { class: 'btn sm', html: Icons.download(13) + '<span>下载</span>', onclick: (e) => this.clickArtifactBtn(e, () => downloadArtifact(art)) }),
+      art.mime === MIME.html ? el('button', { class: 'btn sm ghost', html: Icons.external(13) + '<span>新窗口打开</span>', onclick: (e) => this.clickArtifactBtn(e, () => openArtifact(art)) }) : null);
   },
 
   exportChart(card) {
