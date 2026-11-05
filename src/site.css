@@ -23,7 +23,7 @@
   --text-bluish:#152443;
   --text-2:rgba(0,0,0,.7);
   --text-3:rgba(0,0,0,.65);
-  --text-placeholder:#8691a1;
+  --text-placeholder:#666d78;   /* 4.92:1 @ #f9f8f8，原 #8691a1 只有 3.01:1，不达 AA */
   --brand:#4d6bfe;
   --brand-deep:#3a65c2;
   --brand-medium:#4176e6;
@@ -63,6 +63,7 @@
   color-scheme:light;
 }
 html[data-theme="dark"]{
+  --brand-deep:#2f57b0;   /* 暗色下压深一档，保证 logo 白字 >= 4.5:1 */
   --bg-page:#0a0a0a;
   --bg-overlay:#262626;
   --bg-dark:#f5f5f5;
@@ -79,9 +80,9 @@ html[data-theme="dark"]{
   --text-bluish:#e8eefb;
   --text-2:rgba(255,255,255,.72);
   --text-3:rgba(255,255,255,.58);
-  --text-placeholder:#8a8a8a;
+  --text-placeholder:#9aa0a6;   /* 暗色下也保证 >= 4.5:1 */
   --brand:#6799fe;
-  --brand-deep:#4b7fe0;
+  /* brand-deep 由上方统一给 #2f57b0，这里不再覆盖 */
   --brand-medium:#7fabff;
   --brand-soft:rgba(103,153,254,.14);
   --link:#9dc0ff;
@@ -134,7 +135,8 @@ img{max-width:100%}
 .logo{
   width:28px;height:28px;border-radius:9px;
   display:grid;place-items:center;
-  background:var(--brand);color:#fff;font-weight:700;font-size:15px;
+  background:var(--brand-deep);color:#fff;font-weight:700;font-size:15px;
+  forced-color-adjust:none;
   box-shadow:0 2px 8px rgba(77,107,254,.28);
 }
 .brandtxt{flex:1;min-width:0}
@@ -143,7 +145,7 @@ img{max-width:100%}
 #btnNavClose.navclose{display:none}
 .side-actions{padding:0 4px 10px}
 #sessions{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 2px 8px;min-height:0}
-.sgroup{font-size:11px;color:var(--text-placeholder);padding:12px 10px 5px;font-weight:500}
+.sgroup{font-size:11.5px;color:var(--text-placeholder);padding:12px 10px 5px;font-weight:500}
 .sitem{
   display:flex;align-items:center;gap:8px;
   padding:8px 10px;border-radius:var(--radius-sm);
@@ -1102,8 +1104,8 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
   width:6px;height:6px;border-radius:50%;background:var(--text-placeholder);flex:0 0 auto;
 }
 .modechip.on{
-  color:var(--brand);border-color:rgba(77,107,254,.42);
-  background:var(--brand-soft);
+  color:var(--link);border-color:rgba(77,107,254,.42);
+  background:var(--brand-soft);font-weight:500;
 }
 .modechip.on .mcdot{
   background:var(--brand);
@@ -1253,7 +1255,7 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
 }
 .modechip:hover{border-color:var(--border-strong);color:var(--text-1)}
 .modechip .mcdot{width:6px;height:6px;border-radius:50%;background:var(--text-placeholder);transition:.15s}
-.modechip.on{color:var(--brand);border-color:rgba(77,107,254,.38);background:var(--brand-soft)}
+.modechip.on{color:var(--link);border-color:rgba(77,107,254,.38);background:var(--brand-soft);font-weight:500}
 .modechip.on .mcdot{background:var(--brand);box-shadow:0 0 0 3px rgba(77,107,254,.18)}
 
 /* 企业模式下切换侧栏与主区 */
@@ -1293,7 +1295,7 @@ body.org-mode #orgComposer{display:block;flex:0 0 auto;padding:6px 24px 16px;
 .orgnode .org-dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:var(--text-placeholder)}
 .orgnode .org-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-1)}
 .orgnode .org-role{font-size:10px;color:var(--text-placeholder);flex:0 0 auto}
-.orgnode .org-role.lock{color:var(--ok)}
+.orgnode .org-role.lock{color:#0a7a4d;font-weight:600}
 .orgnode .org-unread{
   flex:0 0 auto;min-width:15px;height:15px;border-radius:8px;padding:0 4px;
   font-size:9.5px;display:grid;place-items:center;background:var(--brand);color:#fff;
@@ -1456,7 +1458,7 @@ body.org-mode #orgComposer{display:block;flex:0 0 auto;padding:6px 24px 16px;
 .org-cta-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .org-cta-tx b{font-size:13.5px;color:var(--text-1);font-weight:600}
 .org-cta-tx span{font-size:11.5px;color:var(--text-placeholder);line-height:1.45}
-.org-cta-go{flex:0 0 auto;color:var(--brand);font-size:15px}
+.org-cta-go{flex:0 0 auto;color:var(--text-2);font-size:15px}
 
 /* ---- 工具卡片上的「交给团队」 ---- */
 .org-send{
@@ -1488,8 +1490,8 @@ body.org-mode #orgComposer{display:block;flex:0 0 auto;padding:6px 24px 16px;
   padding:5px 12px;border-radius:8px;font-size:12px;font-weight:500;
   background:var(--glass-2);border:1px solid var(--border-subtle);color:var(--text-2);
 }
-.tef-node.lead{background:rgba(217,155,28,.1);border-color:rgba(217,155,28,.32);color:#a0740f}
-.tef-node.insp{background:rgba(15,157,99,.09);border-color:rgba(15,157,99,.3);color:var(--ok)}
+.tef-node.lead{background:rgba(217,155,28,.12);border-color:rgba(217,155,28,.36);color:#7a5507;font-weight:600}
+.tef-node.insp{background:rgba(15,157,99,.1);border-color:rgba(15,157,99,.3);color:#0a7a4d;font-weight:600}
 .tef-arrow{color:var(--text-placeholder);font-size:12px}
 .te-tips{
   display:flex;justify-content:center;gap:22px;flex-wrap:wrap;
@@ -1506,3 +1508,22 @@ body.org-mode #orgComposer{display:block;flex:0 0 auto;padding:6px 24px 16px;
   .te-tips{gap:14px;font-size:11px}
   .trace-empty{padding:26px 14px 20px}
 }
+
+/* ---- 并行分派 ---- */
+.tevt-parallel{
+  background:linear-gradient(140deg, rgba(139,92,246,.09), rgba(77,107,254,.06));
+  border-color:rgba(139,92,246,.3);
+}
+.tevt-parallel .tevt-ico{color:#7c5cf0}
+.tevt-parallel .tevt-hd b{color:#6d4fd6}
+.tevt-tag.par{
+  background:rgba(139,92,246,.14);color:#6d4fd6;
+  border:1px solid rgba(139,92,246,.26);
+}
+.tevt.in-parallel{border-left:2px solid rgba(139,92,246,.45)}
+
+/* 暗色主题：上面为达标而压深的小字要提亮，否则在深底上反而看不清 */
+html[data-theme="dark"] .orgnode .org-role.lock{color:#4ade80}
+html[data-theme="dark"] .tef-node.lead{color:#f0b429;background:rgba(240,180,41,.14);border-color:rgba(240,180,41,.34)}
+html[data-theme="dark"] .tef-node.insp{color:#4ade80;background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.3)}
+html[data-theme="dark"] .modechip.on{color:#9db9ff}

@@ -270,7 +270,7 @@ const Inspector = {
           { role: 'user', content: payload }
         ],
         tools: [],                     // 检查者不调用任何工具，避免被工具结果带偏
-        signal: State.abort ? State.abort.signal : undefined
+        signal: (typeof OrgRuntime !== 'undefined' && OrgRuntime.signal) ? OrgRuntime.signal() : undefined
       });
       raw = res.text || '';
       State.usage.inTok += res.usage.in || 0;
@@ -318,6 +318,9 @@ const OrgRuntime = {
   trace: [],            // 本次运行的完整轨迹（UI 实时展示）
   hooks: {},            // UI 注入
   _budget: {},
+  _ac: null,            // 本次运行专用的 AbortController（并行时必须能一起掐断）
+  _busy: new Map(),     // agentId -> Promise，保证同一个 agent 不会被并发重入
+  _parallelSeq: 0,      // 并行组编号
 
   /** 子 Agent 可用的工具白名单（排除需要人工确认的敏感工具） */
   TOOL_WHITELIST: ['web_search', 'web_fetch', 'kb_search', 'render_chart', 'render_mermaid',
@@ -336,8 +339,14 @@ const OrgRuntime = {
     this.abortFlag = false;
     this.trace = [];
     this._budget = {};
+    this._busy = new Map();
+    this._parallelSeq = 0;
+    try { if (this._ac) this._ac.abort(); } catch { }
+    this._ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     Org.resetRun();
   },
+  /** 所有 LLM 调用统一用这个 signal，停止时能真正掐断 */
+  signal() { return this._ac ? this._ac.signal : undefined; },
 
   /** 顶部入口：把目标交给大领导，直到产出最终答复 */
   async run(goal, opts = {}) {
@@ -368,7 +377,11 @@ const OrgRuntime = {
     }
   },
 
-  stop() { this.abortFlag = true; for (const n of Org.all()) if (n.status === 'running') n.status = 'idle'; },
+  stop() {
+    this.abortFlag = true;
+    try { if (this._ac) this._ac.abort(); } catch { }
+    for (const n of Org.all()) if (n.status === 'running') n.status = 'idle';
+  },
 
   /** 节点的角色 prompt（检查者走硬编码，不用这里的 prompt） */
   buildSystemPrompt(node, ctx = {}) {
@@ -426,6 +439,38 @@ const OrgRuntime = {
           }
         }
       });
+
+      // 并行分派：多个互不依赖的子任务同时开跑
+      if (subs.length >= 2) {
+        tools.push({
+          type: 'function',
+          function: {
+            name: 'dispatch_parallel',
+            description: '把多个「互不依赖」的子任务同时分派给多个直属下级，并行执行，等全部完成一起返回。'
+              + '适合能同时做的活（例如同时调研三家公司、同时产出表格与文档）。'
+              + '有先后依赖时必须用 dispatch_task 串行做，不要用这个。',
+            parameters: {
+              type: 'object',
+              properties: {
+                tasks: {
+                  type: 'array',
+                  description: '要并行分派的任务列表（建议 2–4 个）',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      agent_id: { type: 'string', description: '下级 id，可选值：' + subs.map((s2) => s2.id).join(' / ') },
+                      task: { type: 'string', description: '要它做的具体事情，自包含' },
+                      acceptance: { type: 'string', description: '验收标准' }
+                    },
+                    required: ['agent_id', 'task']
+                  }
+                }
+              },
+              required: ['tasks']
+            }
+          }
+        });
+      }
     }
 
     tools.push({
@@ -557,7 +602,7 @@ const OrgRuntime = {
       const res = await LLM.chat({
         messages,
         tools,
-        signal: State.abort ? State.abort.signal : undefined,
+        signal: this.signal() || (State.abort ? State.abort.signal : undefined),
         onDelta: (d, all) => { this.say({ type: 'delta', nodeId: node.id, text: all.slice(-80) }); }
       });
       State.usage.inTok += res.usage.in || 0;
@@ -586,49 +631,127 @@ const OrgRuntime = {
     return { text };
   },
 
-  /** 节点工具的实际执行 */
-  async execNodeTool(node, call, ctx) {
-    const name = call.name;
-    const args = call.arguments || {};
+  /** 校验某个 id 是不是自己的直属下级，返回节点 */
+  checkSubordinate(boss, agentId) {
+    const id = String(agentId || '').trim();
+    const sub = Org.get(id);
+    const opts = Org.childrenOf(boss.id).map((x) => `${x.id}（${x.name}）`).join(' / ') || '（你没有下级）';
+    if (!sub) throw new Error(`找不到这个下级：${id || '(空)'}；可选：${opts}`);
+    if (sub.parentId !== boss.id) throw new Error(`${sub.name} 不是你的直属下级；可选：${opts}`);
+    if (sub.role === 'inspector') throw new Error('检查者不接任务');
+    if (Org.depth(sub.id) >= Org.data.maxDepth) throw new Error('层级超限');
+    return sub;
+  },
 
-    if (name === 'dispatch_task') {
-      const sub = Org.get(String(args.agent_id || ''));
-      if (!sub) throw new Error('找不到这个下级：' + args.agent_id + '（可选：' + Org.childrenOf(node.id).map((s) => s.id).join('/') + '）');
-      if (sub.parentId !== node.id) throw new Error(sub.name + ' 不是你的直属下级');
-      const d = Org.depth(sub.id);
-      if (d >= Org.data.maxDepth) throw new Error('层级超限');
+  /**
+   * 派一个任务给一个下级，等它做完并回传。
+   * 同一个 agent 用 Promise 链串行化：如果它正在忙，后来的调用排队等待，
+   * 这样并行批次里即使误派同一个对象也不会把它的上下文搅乱。
+   */
+  async dispatchOne(boss, sub, { task, acceptance, ctx = {}, group = null }) {
+    const prev = this._busy.get(sub.id) || Promise.resolve();
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const mine = prev.then(() => gate);
+    this._busy.set(sub.id, mine);
+
+    await prev;   // 排队：上一个任务做完才轮到这次
+    try {
+      if (this.abortFlag) return { node: sub.name, text: '（已停止）', review: null, aborted: true };
 
       this.say({
-        type: 'dispatch', nodeId: node.id, to: sub.id,
-        text: `${node.name} → ${sub.name}：${truncate(args.task, 100)}`
+        type: 'dispatch', nodeId: boss.id, to: sub.id, group,
+        text: `${boss.name} → ${sub.name}：${truncate(task, 100)}`
       });
-      OrgBus.send(node.id, sub.id, {
-        subject: '任务分派', body: String(args.task || ''), kind: 'dispatch'
+      OrgBus.send(boss.id, sub.id, {
+        subject: group ? '并行任务分派' : '任务分派', body: task, kind: 'dispatch'
       });
 
-      const subRes = await this.runNode(sub.id, String(args.task || ''), {
+      const subRes = await this.runNode(sub.id, task, {
         attachments: ctx.attachments || [],
         depth: (ctx.depth || 0) + 1,
-        acceptance: String(args.acceptance || ''),
+        acceptance,
         top: false
       });
 
-      OrgBus.send(sub.id, node.id, {
+      OrgBus.send(sub.id, boss.id, {
         subject: '任务结果', body: truncate(subRes.text, 8000), kind: 'report'
       });
       this.say({
-        type: 'report', nodeId: sub.id, to: node.id,
-        text: `${sub.name} 交付给 ${node.name}（${subRes.review ? subRes.review.score + ' 分 ' + (subRes.review.verdict === 'pass' ? '通过' : '未通过') : '未审核'}）`
+        type: 'report', nodeId: sub.id, to: boss.id, group,
+        text: `${sub.name} 交付给 ${boss.name}（` +
+          (subRes.review ? `${subRes.review.score} 分 ${subRes.review.verdict === 'pass' ? '通过' : '未通过'}` : '未审核') + '）'
       });
 
       const rv = subRes.review;
-      return [
+      const text = [
         `下级「${sub.name}」的交付：`,
         subRes.text || '(空)',
         '',
         rv ? `检查者评分：${rv.score}（${rv.verdict === 'pass' ? '通过' : '未通过'}）` : '',
         rv && rv.mustFix && rv.mustFix.length ? '待改进：' + rv.mustFix.join('；') : ''
       ].filter(Boolean).join('\n');
+
+      return { node: sub.name, text, review: rv, attempts: subRes.attempts };
+    } finally {
+      release();
+      // 清理已完成的锁，避免 Map 无限增长
+      if (this._busy.get(sub.id) === mine) this._busy.delete(sub.id);
+    }
+  },
+
+  /** 节点工具的实际执行 */
+  async execNodeTool(node, call, ctx) {
+    const name = call.name;
+    const args = call.arguments || {};
+
+    if (name === 'dispatch_task') {
+      const sub = this.checkSubordinate(node, args.agent_id);
+      const r = await this.dispatchOne(node, sub, {
+        task: String(args.task || ''),
+        acceptance: String(args.acceptance || ''),
+        ctx,
+        group: null
+      });
+      return r.text;
+    }
+
+    if (name === 'dispatch_parallel') {
+      const list = Array.isArray(args.tasks) ? args.tasks : [];
+      if (!list.length) throw new Error('tasks 不能为空');
+      if (list.length > 5) throw new Error('一次最多并行 5 个任务，避免请求过多');
+
+      // 校验：都是直属下级；同一批里同一 agent 只能出现一次（否则会产生歧义）
+      const seen = new Set();
+      const items = list.map((t, i) => {
+        const sub = this.checkSubordinate(node, t && t.agent_id);
+        if (seen.has(sub.id)) throw new Error(`「${sub.name}」在同一批里出现了多次；如果要给它两个任务，请合并成一个，或分批派`);
+        seen.add(sub.id);
+        return { sub, task: String((t && t.task) || ''), acceptance: String((t && t.acceptance) || ''), idx: i };
+      });
+
+      const gid = 'pg' + (++this._parallelSeq);
+      this.say({
+        type: 'parallel-start', nodeId: node.id, group: gid,
+        text: `${node.name} 同时派出 ${items.length} 个任务：` + items.map((it) => it.sub.name).join('、')
+      });
+
+      const results = await Promise.all(items.map((it) => this.dispatchOne(node, it.sub, {
+        task: it.task, acceptance: it.acceptance, ctx, group: gid
+      })));
+
+      this.say({
+        type: 'parallel-end', nodeId: node.id, group: gid,
+        text: `${items.length} 个并行任务全部返回（通过 ${results.filter((r) => r.review && r.review.verdict === 'pass').length} 个）`
+      });
+
+      return [
+        `以下是 ${results.length} 个并行任务的结果，请综合它们再给出答复：`,
+        '',
+        ...results.map((r, i) => `### ${i + 1}. ${r.node}\n${r.text || '(空)'}\n` +
+          (r.review ? `检查者：${r.review.score} 分（${r.review.verdict === 'pass' ? '通过' : '未通过'}）` +
+            (r.review.mustFix && r.review.mustFix.length ? '；待改进：' + r.review.mustFix.join('；') : '') : '未审核'))
+      ].join('\n');
     }
 
     if (name === 'send_message') {

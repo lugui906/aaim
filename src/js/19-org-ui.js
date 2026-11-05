@@ -184,7 +184,7 @@ const OrgUI = {
     box.innerHTML = '';
     const item = (k, v, cls, tip) => box.append(el('span', { class: 'ostat ' + (cls || ''), title: tip || '' }, el('b', { text: String(v) }), el('span', { text: k })));
     item('在编', nodes.length, '', '指挥链 + 检查者');
-    item('运行中', running, running ? 'hot' : '');
+    item(running > 1 ? '并行中' : '运行中', running, running ? 'hot' : '');
     item('完成', done, done ? 'ok' : '');
     blocked ? item('未通过', blocked, 'warn') : null;
     item('审核通过', passed, passed ? 'ok' : '');
@@ -222,20 +222,23 @@ const OrgUI = {
           el('div', { class: 'tevt-hd' }, el('b', { text: nodeName(ev.nodeId) }), el('span', { class: 'tevt-tag', text: '开始' })),
           el('div', { class: 'tevt-tx', text: ev.text })));
     } else if (ev.type === 'dispatch') {
-      node = el('div', { class: 'tevt tevt-dispatch' },
+      node = el('div', { class: 'tevt tevt-dispatch' + (ev.group ? ' in-parallel' : '') },
         el('span', { class: 'tevt-ico', html: Icons.lead ? Icons.lead(13) : '' }),
         el('div', { class: 'tevt-body' },
           el('div', { class: 'tevt-hd' },
             el('span', { class: 'who ' + roleCls(ev.nodeId), text: nodeName(ev.nodeId) }),
             el('span', { class: 'arrow', text: '→' }),
-            el('span', { class: 'who ' + roleCls(ev.to), text: nodeName(ev.to) })),
+            el('span', { class: 'who ' + roleCls(ev.to), text: nodeName(ev.to) }),
+            ev.group ? el('span', { class: 'tevt-tag par', text: '并行' }) : null),
           el('div', { class: 'tevt-tx', text: ev.text })));
     } else if (ev.type === 'report') {
-      node = el('div', { class: 'tevt tevt-report' },
+      node = el('div', { class: 'tevt tevt-report' + (ev.group ? ' in-parallel' : '') },
         el('span', { class: 'tevt-ico', html: Icons.check(13) }),
         el('div', { class: 'tevt-body' },
-          el('div', { class: 'tevt-hd' }, el('span', { text: ev.text })),
-          el('div', { class: 'tevt-tx', text: `交付给 ${nodeName(ev.to)}` })));
+          el('div', { class: 'tevt-hd' },
+            el('span', { text: ev.text }),
+            ev.group ? el('span', { class: 'tevt-tag par', text: '并行' }) : null),
+          ev.group ? el('div', { class: 'tevt-tx', text: `交付给 ${nodeName(ev.to)}` }) : null));
     } else if (ev.type === 'review') {
       const pass = ev.verdict === 'pass';
       node = el('div', { class: 'tevt tevt-review ' + (pass ? 'pass' : 'reject') },
@@ -248,6 +251,15 @@ const OrgUI = {
             el('span', { class: 'sub', text: '审核 ' + nodeName(ev.nodeId) })),
           (ev.reasons && ev.reasons.length) ? el('div', { class: 'tevt-tx', text: ev.reasons.join('；') }) : null,
           (ev.mustFix && ev.mustFix.length) ? el('div', { class: 'tevt-fix', text: '必须改：' + ev.mustFix.join('；') }) : null));
+    } else if (ev.type === 'parallel-start' || ev.type === 'parallel-end') {
+      const isStart = ev.type === 'parallel-start';
+      node = el('div', { class: 'tevt tevt-parallel' },
+        el('span', { class: 'tevt-ico', html: Icons.flow ? Icons.flow(13) : '' }),
+        el('div', { class: 'tevt-body' },
+          el('div', { class: 'tevt-hd' },
+            el('b', { text: isStart ? '并行分派' : '并行完成' }),
+            el('span', { class: 'tevt-tag', text: '同时执行' })),
+          el('div', { class: 'tevt-tx', text: ev.text })));
     } else if (ev.type === 'node-rework') {
       node = el('div', { class: 'tevt tevt-warn' },
         el('span', { class: 'tevt-ico', html: Icons.retry(13) }),
