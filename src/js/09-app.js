@@ -407,6 +407,8 @@ const App = {
     });
     this.setThemeIcon(State.settings.theme);
     $('#btnSettings').addEventListener('click', () => Drawer.open('model'));
+    // 顶栏模式切换：单 Agent ⇄ 企业团队
+    $('#modeChip').addEventListener('click', () => this.toggleOrgMode());
     // 更多菜单
     const menu = $('#moreMenu');
     $('#btnMore').addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('open'); UI.updateMemoryBadge(); });
@@ -414,6 +416,7 @@ const App = {
     menu.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => {
       menu.classList.remove('open');
       const k = b.dataset.m;
+      if (k === 'org') OrgUI.applyMode(true);
       if (k === 'memory') Drawer.open('memory');
       if (k === 'spec') Drawer.open('spec');
       if (k === 'export') this.exportMenu();
@@ -428,6 +431,10 @@ const App = {
     // 用量条 & 状态
     UI.updateHeader();
     UI.updateMemoryBadge();
+    // 恢复上次的模式，并初始化企业面板
+    OrgUI.init();
+    if (State.org && State.org.enabled) OrgUI.applyMode(true);
+    UI.updateModeChip();
     // 规格面板等首次渲染
     Drawer.init();
     // 欢迎
@@ -448,6 +455,26 @@ const App = {
     if (!b) return;
     b.innerHTML = theme === 'dark' ? ICON_SUN : ICON_MOON;
     b.title = theme === 'dark' ? '切换到浅色' : '切换到深色';
+  },
+
+  /** 切换企业式多 Agent 模式 */
+  toggleOrgMode() {
+    const next = !(State.org && State.org.enabled);
+    if (next) {
+      Org.data.enabled = true;
+      Org.save();
+      // 首次进入：保证有最简可用的团队（领导 + 检查者已由 defaults 提供）
+      if (!Org.validate().ok) { try { Org.data = Org.defaults(); Org.save(); } catch { } }
+      OrgUI.applyMode(true);
+      UI.updateModeChip();
+      toast('已开启企业模式：目标交给大领导，由它拆解、派活、请检查者验收', 'ok', 4000);
+    } else {
+      Org.data.enabled = false; Org.save();
+      OrgUI.applyMode(false);
+      UI.updateModeChip();
+      toast('已切回单 Agent 模式');
+      UI.renderMessages();
+    }
   },
 
   /* ---------------- 移动端侧栏开合 ---------------- */

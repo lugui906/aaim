@@ -1095,6 +1095,426 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
   color:var(--brand);border:1px solid rgba(77,107,254,.3);background:var(--brand-soft);
 }
 .frame .bar .barrun:hover{background:rgba(77,107,254,.16)}
+
+/* ============================================================
+   企业式多 Agent：模式 chip / 组织面板 / 通信流 / 审查卡
+   ============================================================ */
+.modechip{
+  display:inline-flex;align-items:center;gap:6px;
+  height:26px;padding:0 10px;border-radius:999px;
+  font-size:12px;color:var(--text-2);
+  background:var(--glass-2);border:1px solid var(--border-subtle);
+  transition:all .16s ease;white-space:nowrap;
+}
+.modechip:hover{border-color:var(--border-strong);color:var(--text-1)}
+.modechip .mcdot{
+  width:6px;height:6px;border-radius:50%;background:var(--text-placeholder);flex:0 0 auto;
+}
+.modechip.on{
+  color:var(--brand);border-color:rgba(77,107,254,.42);
+  background:var(--brand-soft);
+}
+.modechip.on .mcdot{
+  background:var(--brand);
+  box-shadow:0 0 0 3px rgba(77,107,254,.18);
+  animation:orgPulse 2.2s ease-in-out infinite;
+}
+@keyframes orgPulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* ---------- 组织面板 ---------- */
+.orgpanel{
+  position:absolute;top:0;right:0;bottom:0;width:min(430px,100%);
+  background:var(--bg-page);
+  border-left:1px solid var(--border-subtle);
+  transform:translateX(101%);
+  transition:transform .24s cubic-bezier(.4,0,.2,1);
+  z-index:32;display:flex;flex-direction:column;
+  box-shadow:var(--shadow-lg);
+}
+.orgpanel.open{transform:none}
+.orghd{
+  display:flex;align-items:center;gap:8px;padding:12px 14px;
+  border-bottom:1px solid var(--border-subtle);flex:0 0 auto;
+}
+.orghd b{font-size:14.5px}
+.orgsum{font-size:11.5px;color:var(--text-placeholder)}
+.orgtabs{
+  display:flex;gap:2px;padding:8px 12px 0;
+  border-bottom:1px solid var(--border-subtle);flex:0 0 auto;
+}
+.orgtab{
+  padding:6px 11px 9px;font-size:12.5px;color:var(--text-3);
+  border-bottom:2px solid transparent;cursor:pointer;
+}
+.orgtab:hover{color:var(--text-1)}
+.orgtab.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:500}
+.orgbody{flex:1;overflow-y:auto;padding:12px 14px 40px;min-height:0}
+
+.orgempty{
+  padding:26px 14px;text-align:center;color:var(--text-placeholder);font-size:12.5px;
+  display:flex;flex-direction:column;gap:12px;align-items:center;line-height:1.7;
+}
+.orgrow{
+  display:flex;align-items:flex-start;gap:9px;
+  padding:9px 8px;border-radius:10px;cursor:pointer;
+  border:1px solid transparent;transition:background .13s,border-color .13s;
+}
+.orgrow:hover{background:var(--glass-2);border-color:var(--border-subtle)}
+.orgindent{flex:0 0 auto;border-left:1px dashed var(--border-subtle);height:100%}
+.orgindent[style*="width:0px"]{border-left:0}
+.orgdot{
+  width:7px;height:7px;border-radius:50%;flex:0 0 auto;margin-top:6px;
+  background:var(--border-strong);
+}
+.orgrow.role-leader .orgdot{background:var(--brand);box-shadow:0 0 0 3px rgba(77,107,254,.16)}
+.orgrow.role-manager .orgdot{background:#8b5cf6}
+.orgrow.role-inspector .orgdot{background:var(--warn);box-shadow:0 0 0 3px rgba(184,121,26,.16)}
+.orgmeta{flex:1;min-width:0}
+.orgname{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13.5px}
+.orgname b{font-weight:600}
+.orgrole{
+  font-size:10.5px;padding:1px 6px;border-radius:5px;
+  background:var(--glass-2);border:1px solid var(--border-subtle);color:var(--text-3);
+}
+.orgrole.insp{color:var(--warn);border-color:rgba(184,121,26,.35);background:rgba(184,121,26,.08)}
+.orgstat{font-size:10.5px;color:var(--text-placeholder)}
+.orgstat.st-working{color:var(--brand)}
+.orgstat.st-failed{color:var(--err)}
+.orgstat.st-done{color:var(--ok)}
+.orgbrief{font-size:11.5px;color:var(--text-3);margin-top:2px;line-height:1.55}
+.orgnums{font-size:10.5px;color:var(--text-placeholder);margin-top:3px;font-variant-numeric:tabular-nums}
+.orghint{
+  margin-top:14px;padding:10px 12px;border-radius:10px;
+  background:var(--glass-recess);border:1px solid var(--border-subtle);
+  font-size:11.5px;color:var(--text-3);line-height:1.65;
+}
+
+/* ---------- 通信流 ---------- */
+.buslist{display:flex;flex-direction:column;gap:7px}
+.busmsg{
+  border:1px solid var(--border-subtle);border-radius:10px;
+  padding:8px 11px;background:var(--glass-2);
+  border-left:2px solid var(--border-strong);
+}
+.busmsg.k-task{border-left-color:var(--brand)}
+.busmsg.k-result{border-left-color:var(--ok)}
+.busmsg.k-verdict{border-left-color:var(--warn)}
+.busmsg.k-broadcast{border-left-color:#8b5cf6}
+.busmsg.k-review{border-left-color:var(--info, #60a5fa)}
+.bmhd{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-3);flex-wrap:wrap}
+.bmhd b{color:var(--text-1);font-weight:600}
+.bmarrow{opacity:.5}
+.bmk{
+  font-size:10px;padding:0 5px;border-radius:4px;
+  background:var(--glass-1);border:1px solid var(--border-subtle);
+}
+.bmt{margin-left:auto;font-size:10.5px;color:var(--text-placeholder);font-variant-numeric:tabular-nums}
+.bmb{font-size:12.5px;color:var(--text-2);margin-top:4px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.bmatt{display:flex;align-items:center;gap:5px;margin-top:6px;flex-wrap:wrap;font-size:11px;color:var(--text-placeholder)}
+.bmtag{
+  padding:1px 6px;border-radius:5px;font-size:10.5px;
+  background:var(--brand-soft);color:var(--brand);border:1px solid rgba(77,107,254,.24);
+}
+
+/* ---------- 审查卡 ---------- */
+.revbox{
+  border:1px solid var(--border-default);border-radius:12px;
+  padding:11px 13px;margin-bottom:9px;background:var(--glass-2);
+}
+.revbox.pass{border-color:rgba(15,157,99,.3);background:rgba(15,157,99,.04)}
+.revbox.fail{border-color:rgba(217,68,54,.28);background:rgba(217,68,54,.04)}
+.revhd{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.revbadge{
+  font-size:10.5px;padding:1.5px 7px;border-radius:999px;font-weight:600;
+}
+.revbox.pass .revbadge{background:rgba(15,157,99,.12);color:var(--ok)}
+.revbox.fail .revbadge{background:rgba(217,68,54,.12);color:var(--err)}
+.revreason{font-size:12px;color:var(--text-2);margin-top:6px;line-height:1.6}
+.revitems{margin-top:7px;display:flex;flex-direction:column;gap:4px}
+.revitem{display:flex;gap:7px;font-size:11.5px;line-height:1.55}
+.revi{
+  flex:0 0 auto;font-family:var(--font-mono);font-size:10px;
+  padding:0 4px;border-radius:4px;
+}
+.revitem.ok .revi{background:rgba(15,157,99,.12);color:var(--ok)}
+.revitem.no .revi{background:rgba(217,68,54,.12);color:var(--err)}
+.revitem.no{color:var(--err)}
+.revsug{font-size:11.5px;color:var(--warn);margin-top:7px;line-height:1.6}
+.orgpre{
+  font-family:var(--font-mono);font-size:11.5px;line-height:1.6;
+  background:var(--code-bg);border:1px solid var(--border-subtle);border-radius:9px;
+  padding:9px 11px;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-word;
+}
+@media(max-width:900px){
+  .orgpanel{width:100%}
+  .modechip{font-size:11.5px;padding:0 8px}
+}
+
+/* ============================================================
+   企业模式（多 Agent 编排）
+   ============================================================ */
+/* 顶栏模式 chip */
+.modechip{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;
+  border-radius:999px;font-size:12px;color:var(--text-2);
+  background:var(--glass-2);border:1px solid var(--border-subtle);
+  cursor:pointer;transition:.15s;white-space:nowrap;
+}
+.modechip:hover{border-color:var(--border-strong);color:var(--text-1)}
+.modechip .mcdot{width:6px;height:6px;border-radius:50%;background:var(--text-placeholder);transition:.15s}
+.modechip.on{color:var(--brand);border-color:rgba(77,107,254,.38);background:var(--brand-soft)}
+.modechip.on .mcdot{background:var(--brand);box-shadow:0 0 0 3px rgba(77,107,254,.18)}
+
+/* 企业模式下切换侧栏与主区 */
+#orgPanel,#orgMain,#orgComposer{display:none}
+body.org-mode #sessions,
+body.org-mode #composer,
+body.org-mode .side-actions{display:none}
+body.org-mode #orgPanel{display:flex;flex-direction:column;flex:1;min-height:0;padding:0 2px}
+body.org-mode #orgMain{display:flex;flex:1;min-height:0;flex-direction:column}
+body.org-mode #stream{display:none}
+body.org-mode #orgComposer{display:block;flex:0 0 auto;padding:6px 24px 16px;
+  background:linear-gradient(to top, color-mix(in srgb,var(--bg-page) 72%,transparent) 40%, transparent)}
+
+/* ---- 组织树 ---- */
+.org-title{display:flex;align-items:center;gap:8px;padding:8px 8px 6px;font-size:12.5px}
+.org-title b{font-size:12.5px;font-weight:600;color:var(--text-1)}
+.org-title .btn{height:24px;padding:0 8px;font-size:11.5px}
+#orgStats{display:flex;flex-wrap:wrap;gap:5px;padding:0 8px 8px}
+.ostat{
+  display:inline-flex;align-items:baseline;gap:3px;
+  padding:2px 7px;border-radius:6px;font-size:10.5px;color:var(--text-placeholder);
+  background:var(--glass-recess);border:1px solid var(--border-subtle);
+}
+.ostat b{font-size:11.5px;color:var(--text-2);font-weight:600}
+.ostat.ok b{color:var(--ok)} .ostat.hot b{color:var(--brand)} .ostat.warn b{color:var(--warn)}
+
+#orgTree{flex:1;overflow-y:auto;min-height:0;padding:0 4px 10px}
+.org-sec{font-size:10.5px;color:var(--text-placeholder);letter-spacing:.04em;padding:10px 8px 4px}
+.orgitem{position:relative}
+.orgnode{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 8px;border-radius:8px;font-size:12.5px;cursor:default;
+  margin-left:calc(var(--depth,0) * 10px);
+  transition:background .12s;
+}
+.orgnode:hover{background:var(--glass-2)}
+.orgnode .org-dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:var(--text-placeholder)}
+.orgnode .org-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-1)}
+.orgnode .org-role{font-size:10px;color:var(--text-placeholder);flex:0 0 auto}
+.orgnode .org-role.lock{color:var(--ok)}
+.orgnode .org-unread{
+  flex:0 0 auto;min-width:15px;height:15px;border-radius:8px;padding:0 4px;
+  font-size:9.5px;display:grid;place-items:center;background:var(--brand);color:#fff;
+}
+.orgnode .org-acts{display:flex;gap:1px;margin-left:auto;opacity:0;transition:opacity .12s}
+.orgnode:hover .org-acts{opacity:1}
+.org-mini{
+  width:18px;height:18px;border-radius:5px;display:grid;place-items:center;
+  font-size:12px;line-height:1;color:var(--text-placeholder);
+}
+.org-mini:hover{background:var(--glass-1);color:var(--text-1)}
+.org-mini.danger:hover{color:var(--err)}
+/* 角色配色 */
+.orgnode.role-leader .org-dot{background:#d99b1c}
+.orgnode.role-subleader .org-dot{background:var(--brand)}
+.orgnode.role-worker .org-dot{background:#9aa7b8}
+.orgnode.role-inspector .org-dot{background:var(--ok)}
+/* 状态 */
+.orgnode.st-running{background:var(--brand-soft)}
+.orgnode.st-running .org-dot{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.orgnode.st-done .org-dot{box-shadow:0 0 0 2px rgba(15,157,99,.22)}
+.orgnode.st-blocked .org-dot{background:var(--warn)!important;box-shadow:0 0 0 2px rgba(184,121,26,.22)}
+.orgnode.st-error .org-dot{background:var(--err)!important}
+.orgkids{border-left:1px dashed var(--border-subtle);margin-left:11px}
+.org-addins{
+  margin:8px 8px 0;height:26px;border-radius:7px;font-size:11.5px;
+  color:var(--text-3);border:1px dashed var(--border-default);width:calc(100% - 16px);
+}
+.org-addins:hover{color:var(--brand);border-color:var(--brand)}
+.org-empty{font-size:11.5px;color:var(--text-placeholder);padding:8px}
+.org-foot{padding:8px;font-size:10.5px;color:var(--text-placeholder);border-top:1px solid var(--border-subtle)}
+
+/* ---- 运行轨迹 ---- */
+#orgTrace{flex:1;overflow-y:auto;min-height:0;padding:20px 24px 12px;max-width:820px;margin:0 auto;width:100%}
+.trace-empty{text-align:center;color:var(--text-placeholder);padding:60px 20px}
+.trace-empty .te-ico{
+  width:44px;height:44px;border-radius:13px;margin:0 auto 14px;
+  display:grid;place-items:center;background:var(--brand-soft);color:var(--brand);
+}
+.trace-empty p{margin:6px 0;font-size:13px;color:var(--text-2)}
+.trace-empty .sub{font-size:12px;color:var(--text-placeholder);max-width:420px;margin:0 auto;line-height:1.6}
+
+.tevt{
+  display:flex;gap:9px;margin-bottom:9px;padding:9px 12px;
+  border-radius:11px;background:var(--glass-recess);
+  border:1px solid var(--border-subtle);
+  animation:msgIn .18s ease;
+}
+.tevt-ico{flex:0 0 auto;width:20px;height:20px;display:grid;place-items:center;color:var(--text-placeholder);margin-top:1px}
+.tevt-body{min-width:0;flex:1}
+.tevt-hd{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:var(--text-1)}
+.tevt-hd .who{font-weight:600}
+.tevt-hd .who.role-leader{color:#b8801a}
+.tevt-hd .who.role-subleader{color:var(--brand)}
+.tevt-hd .who.role-worker{color:var(--text-2)}
+.tevt-hd .who.role-inspector{color:var(--ok)}
+.tevt-hd .arrow{color:var(--text-placeholder);font-size:11px}
+.tevt-hd .sub{color:var(--text-placeholder);font-size:11.5px;font-weight:400}
+.tevt-hd .tevt-tag{font-size:10.5px;padding:0 6px;border-radius:5px;background:var(--glass-1);color:var(--text-placeholder)}
+.tevt-tx{font-size:12.5px;color:var(--text-2);line-height:1.6;margin-top:2px;overflow-wrap:anywhere}
+.tevt-fix{font-size:12px;color:var(--warn);margin-top:4px;line-height:1.55}
+.tevt-att{font-size:11.5px;color:var(--text-placeholder);margin-top:3px}
+.tevt .verdict{font-size:11px;padding:1px 7px;border-radius:999px;font-weight:600}
+.tevt .verdict.ok{color:var(--ok);background:rgba(15,157,99,.1)}
+.tevt .verdict.no{color:var(--err);background:rgba(217,68,54,.1)}
+.tevt .score{font-size:11.5px;color:var(--text-3);font-variant-numeric:tabular-nums}
+/* 事件类型配色 */
+.tevt-start{background:var(--brand-soft);border-color:rgba(77,107,254,.22)}
+.tevt-start .tevt-ico{color:var(--brand)}
+.tevt-dispatch .tevt-ico{color:var(--brand)}
+.tevt-report .tevt-ico{color:var(--ok)}
+.tevt-review.pass{border-color:rgba(15,157,99,.28);background:rgba(15,157,99,.045)}
+.tevt-review.reject{border-color:rgba(217,68,54,.26);background:rgba(217,68,54,.04)}
+.tevt-review.pass .tevt-ico{color:var(--ok)}
+.tevt-review.reject .tevt-ico{color:var(--err)}
+.tevt-warn{border-color:rgba(184,121,26,.28);background:rgba(184,121,26,.05)}
+.tevt-warn .tevt-ico{color:var(--warn)}
+.tevt-err{border-color:rgba(217,68,54,.3);background:rgba(217,68,54,.05)}
+.tevt-err .tevt-ico{color:var(--err)}
+.tevt-ask{border-color:rgba(77,107,254,.26);background:var(--brand-soft)}
+.tevt-msg .tevt-ico{color:var(--text-3)}
+.tevt-tool{opacity:.9}
+.tevt-finish{border-color:rgba(15,157,99,.3);background:rgba(15,157,99,.05)}
+.tevt-finish .tevt-ico{color:var(--ok)}
+.tevt .toolcard{margin:8px 0 0}
+
+/* 最终交付卡 */
+.finalcard{
+  margin:14px 0 20px;border-radius:14px;overflow:hidden;
+  border:1px solid rgba(77,107,254,.26);
+  background:linear-gradient(160deg, var(--lg-tint-a), var(--lg-tint-b));
+  box-shadow:0 6px 26px rgba(77,107,254,.1);
+}
+.fc-hd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border-subtle);font-size:13px}
+.fc-hd .verdict{font-size:11px;padding:1px 8px;border-radius:999px;font-weight:600}
+.fc-hd .verdict.ok{color:var(--ok);background:rgba(15,157,99,.12)}
+.fc-hd .verdict.no{color:var(--err);background:rgba(217,68,54,.12)}
+.fc-hd .score{font-size:11.5px;color:var(--text-3)}
+.fc-body{padding:14px 16px;font-size:14px}
+.fc-fix{padding:10px 16px;border-top:1px solid var(--border-subtle);font-size:12.5px;color:var(--warn);background:rgba(184,121,26,.05)}
+
+/* 企业模式输入区 */
+#orgComposer .box{
+  max-width:768px;margin:0 auto;background:var(--bg-overlay);
+  border:1px solid var(--border-default);border-radius:24px;padding:14px 16px 11px;
+  box-shadow:var(--shadow-md);transition:.16s;
+}
+#orgComposer .box:focus-within{border-color:var(--border-strong);box-shadow:var(--shadow-lg)}
+#orgGoal{
+  width:100%;border:0;background:none;outline:none;resize:none;
+  min-height:26px;max-height:200px;line-height:1.7;font-size:14.5px;color:var(--text-1);
+}
+#orgGoal::placeholder{color:var(--text-placeholder)}
+#orgRunBtn,#orgStopBtn{
+  width:34px;height:34px;padding:0;border-radius:50%;
+  background:var(--btn-primary-bg);color:var(--btn-primary-fg);
+  border:0;display:grid;place-items:center;transition:.14s;
+}
+#orgRunBtn:hover,#orgStopBtn:hover{opacity:.82}
+#orgRunBtn svg{width:17px;height:17px}
+#orgStopBtn span{width:10px;height:10px;background:currentColor;border-radius:2px;display:block}
+#orgComposer .hint{max-width:768px;margin:9px auto 0;padding:0 4px;font-size:11.5px;color:var(--text-placeholder);display:flex;gap:14px;flex-wrap:wrap}
+
+/* 消息总线弹窗 */
+.buslist{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto}
+.busrow{padding:9px 11px;border-radius:9px;background:var(--glass-2);border:1px solid var(--border-subtle);font-size:12.5px}
+.busrow.d{border-left:2px solid var(--brand)}
+.busrow.r{border-left:2px solid var(--ok)}
+.busrow.v{border-left:2px solid var(--warn)}
+.bus-hd{display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:12px;flex-wrap:wrap}
+.bus-hd b{color:var(--text-1)}
+.bus-kind{font-size:10px;padding:0 5px;border-radius:4px;background:var(--glass-1);color:var(--text-placeholder)}
+.bus-t{margin-left:auto;font-size:11px;color:var(--text-placeholder)}
+.bus-sub{font-size:12px;color:var(--text-2);margin-top:3px;font-weight:500}
+.bus-body{font-size:12.5px;color:var(--text-2);margin-top:2px;line-height:1.55;overflow-wrap:anywhere}
+.bus-att{font-size:11.5px;color:var(--text-placeholder);margin-top:4px}
+
+/* 窄屏 */
+@media(max-width:900px){
+  #orgTrace{padding:14px 12px 8px}
+  body.org-mode #orgComposer{padding:6px 12px 12px}
+  body.org-mode #orgComposer .box{border-radius:20px;padding:12px 13px 9px}
+  .orgnode{margin-left:calc(var(--depth,0) * 10px)}
+}
+
+/* ---- 首页「开启企业模式」入口 ---- */
+.org-cta{
+  display:flex;align-items:center;gap:11px;width:100%;max-width:520px;
+  margin:0 auto 18px;padding:12px 14px;border-radius:14px;text-align:left;
+  background:linear-gradient(140deg, rgba(77,107,254,.1), rgba(139,92,246,.06));
+  border:1px solid rgba(77,107,254,.28);
+  transition:border-color .14s,transform .12s,box-shadow .16s;
+}
+.org-cta:hover{transform:translateY(-1px);border-color:rgba(77,107,254,.5);box-shadow:0 8px 24px rgba(77,107,254,.14)}
+.org-cta-ico{
+  flex:0 0 auto;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+  background:var(--brand-soft);color:var(--brand);
+}
+.org-cta-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.org-cta-tx b{font-size:13.5px;color:var(--text-1);font-weight:600}
+.org-cta-tx span{font-size:11.5px;color:var(--text-placeholder);line-height:1.45}
+.org-cta-go{flex:0 0 auto;color:var(--brand);font-size:15px}
+
+/* ---- 工具卡片上的「交给团队」 ---- */
+.org-send{
+  display:inline-flex;align-items:center;gap:4px;height:21px;padding:0 8px;
+  border-radius:6px;font-size:11px;color:var(--brand);
+  background:var(--brand-soft);border:1px solid rgba(77,107,254,.24);
+  opacity:0;transition:opacity .12s,background .12s;
+}
+.toolcard:hover .org-send{opacity:1}
+.org-send:hover{background:rgba(77,107,254,.18)}
+.org-send svg{width:11px;height:11px}
+
+/* ---- 企业模式空状态（引导） ---- */
+/* 垂直居中：整块占满追踪区，避免内容挤在顶部、下面空一大片 */
+.trace-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100%;padding:24px 20px;
+}
+#orgTrace:has(.trace-empty){display:flex;flex-direction:column}
+.trace-empty h3{
+  margin:14px 0 8px;font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--text-1);
+}
+.trace-empty .sub{max-width:460px;margin:0 auto;font-size:12.5px;line-height:1.7;color:var(--text-placeholder)}
+.te-flow{
+  display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
+  margin:22px auto 6px;max-width:520px;
+}
+.tef-node{
+  padding:5px 12px;border-radius:8px;font-size:12px;font-weight:500;
+  background:var(--glass-2);border:1px solid var(--border-subtle);color:var(--text-2);
+}
+.tef-node.lead{background:rgba(217,155,28,.1);border-color:rgba(217,155,28,.32);color:#a0740f}
+.tef-node.insp{background:rgba(15,157,99,.09);border-color:rgba(15,157,99,.3);color:var(--ok)}
+.tef-arrow{color:var(--text-placeholder);font-size:12px}
+.te-tips{
+  display:flex;justify-content:center;gap:22px;flex-wrap:wrap;
+  margin:20px auto 0;max-width:560px;
+  font-size:11.5px;color:var(--text-placeholder);
+}
+.te-tips div{display:flex;align-items:baseline;gap:3px}
+.te-tips b{font-family:var(--font-mono);font-size:13px;color:var(--text-1);font-weight:600}
+.te-hint{
+  max-width:480px;margin:20px auto 0;font-size:11.5px;line-height:1.65;
+  color:var(--text-placeholder);padding-top:14px;border-top:1px solid var(--border-subtle);
+}
+@media(max-width:900px){
+  .te-tips{gap:14px;font-size:11px}
+  .trace-empty{padding:26px 14px 20px}
+}
 </style>
 </head>
 <body>
@@ -1111,6 +1531,17 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
       <button id="btnNew" class="btn block"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>新会话</span></button>
     </div>
     <div id="sessions"></div>
+
+    <div id="orgPanel">
+      <div class="org-title">
+        <b>组织架构</b>
+        <span style="flex:1"></span>
+        <button id="orgBusBtn" class="btn sm ghost" title="所有 Agent 之间的往来">消息</button>
+      </div>
+      <div id="orgStats"></div>
+      <div id="orgTree"></div>
+      <div class="org-foot">检查者独立于指挥链，标准由代码固定</div>
+    </div>
     <div class="side-foot">
       <span class="pill" id="queueBadge" style="display:none"></span>
     </div>
@@ -1120,11 +1551,15 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
     <div id="topbar">
       <button id="btnMenu" class="iconbtn" title="会话列表" aria-label="打开会话列表" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <div class="title" id="topTitle">新会话</div>
+      <button id="modeChip" class="modechip" title="切换 单 Agent / 企业团队模式">
+        <span class="mcdot"></span><span id="modeChipText">单 Agent</span>
+      </button>
       <div class="sp"></div>
       <button id="btnTheme" class="iconbtn" title="切换浅色 / 深色"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4L17 7M7 17l-1.6 1.6"/></svg></button>
       <div class="menu-wrap">
         <button id="btnMore" class="iconbtn" title="更多"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
         <div class="menu" id="moreMenu">
+          <button data-m="org">组织架构<em id="orgCount"></em></button>
           <button data-m="memory">长期记忆<em id="memCount"></em></button>
           <button data-m="spec">功能规格对照</button>
           <button data-m="usage">用量与预算<em id="usageInline"></em></button>
@@ -1139,6 +1574,36 @@ html[data-theme="dark"] .menu{background:linear-gradient(165deg,rgba(44,44,44,.9
     <div id="stream">
       <div class="wrap" id="messages"></div>
     </div>
+
+    <div id="orgMain">
+      <div id="orgTrace" class="trace"></div>
+    </div>
+
+    <div id="orgComposer">
+      <div class="box">
+        <div id="orgAttach" class="attach" style="display:none"></div>
+        <textarea id="orgGoal" rows="1" placeholder="把目标交给大领导，例如：调研三家竞品定价，出对比表并给出我们的定价建议"></textarea>
+        <div class="crow">
+          <button id="orgAttachBtn" class="iconbtn" title="附加材料（上传文件，或把工具结果一并交给团队）">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.2h7A1.5 1.5 0 0 1 19 9.7v8.8A1.5 1.5 0 0 1 17.5 20h-13A1.5 1.5 0 0 1 3 18.5z"/></svg>
+          </button>
+          <button id="orgResetBtn" class="iconbtn" title="重置所有成员状态">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 11.5a8 8 0 1 0-2.3 5.6"/><path d="M20 4.5v7h-7"/></svg>
+          </button>
+          <div class="sp"></div>
+          <button id="orgRunBtn" title="交给大领导执行（Ctrl+Enter）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+          </button>
+          <button id="orgStopBtn" style="display:none" title="停止"><span></span></button>
+        </div>
+      </div>
+      <div class="hint">
+        <span>发给 <b>大领导</b>，由它拆解分派</span>
+        <span>每份产出都要过独立检查者</span>
+        <span><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> 执行</span>
+      </div>
+    </div>
+    <input type="file" id="orgFile" multiple accept="image/*,.pdf,.docx,.xlsx,.pptx,.xls,.csv,.txt,.md,.json" style="display:none">
 
     <div id="composer">
       <div class="box">
@@ -1228,11 +1693,18 @@ const estMessagesTokens = (msgs) => msgs.reduce((a, m) => a + 4 + estTokens(type
 const TOAST_MAX = 3;
 /** 让提示条始终浮在输入框上方，不遮挡输入区 */
 function syncToastOffset() {
-  const box = document.querySelector('#composer');
   const wrap = $('#toasts');
-  if (!box || !wrap) return;
-  const h = box.getBoundingClientRect().height;
-  wrap.style.bottom = Math.round(h + 10) + 'px';
+  if (!wrap) return;
+  // 企业模式下 #composer 是隐藏的（高度 0），必须按实际可见的那个输入区算，
+  // 否则提示条会落到底部并压住输入框。
+  let h = 0;
+  for (const sel of ['#orgComposer', '#composer']) {
+    const box = document.querySelector(sel);
+    if (!box) continue;
+    const r = box.getBoundingClientRect();
+    if (r.height > 0 && getComputedStyle(box).display !== 'none') { h = r.height; break; }
+  }
+  wrap.style.bottom = Math.round(h + 12) + 'px';
 }
 window.addEventListener('resize', debounce(syncToastOffset, 120));
 
@@ -1527,6 +1999,8 @@ const State = {
   plugins: Store.get('plugins', []) || [],
   kb: Store.get('kb', { docs: [], chunks: [] }) || { docs: [], chunks: [] },
   audit: [],            // 本次运行的工具审计（L4）
+  org: Store.get('org', null),        // 企业模式的组织架构（惰性初始化）
+  orgBus: Store.get('orgBus', []) || [],  // Agent 之间的通信记录
   running: false,
   abort: null,
   queue: [],            // E1
@@ -1861,6 +2335,14 @@ const MockLLM = {
       return acc;
     };
     const toolNames = new Set((tools || []).map((t) => t.function.name));
+    // —— 企业团队模式：演示模型也走真实的 hire/assign/inspect 链路 ——
+    if (toolNames.has('org_hire') || toolNames.has('org_assign') || toolNames.has('org_inspect')) {
+      const r = MockOrgTurn(messages, toolNames, lastMsg, lastUser);
+      if (r) {
+        if (r.text) await emit(r.text, 4);
+        return { text: r.text || '', thinking: r.thinking || '', toolCalls: r.toolCalls || [], usage: { in: estMessagesTokens(messages), out: estTokens(r.text || '') }, raw: { style: 'mock' } };
+      }
+    }
     // 工具返回后 → 总结
     if (lastMsg && lastMsg.role === 'tool') {
       // ★ 只列「本轮」新产生的工具结果：之前写成 slice(-3) 会把前几轮的也列出来，
@@ -1942,6 +2424,92 @@ const MockLLM = {
     return { text: head, thinking: '需要外部能力，调用注册表中的工具来获取真实结果。', toolCalls: call ? [call] : [], usage: { in: estMessagesTokens(messages), out: estTokens(head) }, raw: { style: 'mock' } };
   }
 };
+
+/* ---------------- 演示模型的企业团队行为 ----------------
+   为了在没配 Key 时也能验证完整链路，这里给出最小可用的"领导行为"：
+   首轮招人 → 派活 → 请检查者 → 汇总。真实模型则走自己的判断。
+-------------------------------------------------------------------------- */
+function MockOrgTurn(messages, toolNames, lastMsg, lastUser) {
+  const me = typeof OrgRunner !== 'undefined' ? OrgRunner.currentAgent : null;
+  if (!me) return null;
+
+  // 已收到工具结果 → 继续下一步
+  if (lastMsg && lastMsg.role === 'tool') {
+    let r = null;
+    try { r = JSON.parse(lastMsg.content); } catch { }
+    const txt = String(lastMsg.content || '');
+
+    // 刚派完活，拿到下级交付 → 请检查者审查
+    if (lastMsg.name === 'org_assign' && toolNames.has('org_inspect') && typeof Org !== 'undefined' && Org.inspectors().length) {
+      const m = /「(.+?)」的交付：\n([\s\S]*)/.exec(txt);
+      const deliver = m ? m[2] : txt;
+      return {
+        text: '收到下级的交付，先请检查者按标准验一遍。\n\n',
+        toolCalls: [{
+          id: uid('call'), name: 'org_inspect', arguments: {
+            requirement: String((lastUser && lastUser.content) || '').slice(0, 800),
+            deliverable: deliver.slice(0, 3000),
+            criteria: ['内容回应了原始需求的每一项', '有明确结论，不是空话或占位', '关键事实/数据有出处或说明依据']
+          }
+        }]
+      };
+    }
+
+    // 刚拿到审查判定 → 汇总收尾
+    if (lastMsg.name === 'org_inspect') {
+      const verdict = /✓ 审查通过/.test(txt) ? 'PASS' : 'FAIL';
+      const final = verdict === 'PASS'
+        ? '已完成，交付物通过独立检查者验收。\n\n' + truncate(txt.replace(/^[^\n]*\n/, ''), 1200)
+        : '检查者判定未通过，需要返工。\n\n' + truncate(txt, 1000);
+      return { text: final, toolCalls: [] };
+    }
+
+    // 刚招完人 → 给他派活
+    if (lastMsg.name === 'org_hire') {
+      const idM = /id=(\w+)/.exec(txt);
+      if (idM && toolNames.has('org_assign')) {
+        return {
+          text: '人已经到位，把活派下去。\n\n',
+          toolCalls: [{
+            id: uid('call'), name: 'org_assign', arguments: {
+              targetId: idM[1],
+              task: String((lastUser && lastUser.content) || '').slice(0, 900) + '\n\n请产出可直接交付的中文结果，不要占位词。'
+            }
+          }]
+        };
+      }
+    }
+    return null;
+  }
+
+  // 首轮：领导先看看团队
+  if (toolNames.has('org_status') && !me.childIds.length) {
+    return { text: '先看看团队里都有谁。\n\n', toolCalls: [{ id: uid('call'), name: 'org_status', arguments: {} }] };
+  }
+
+  // 首轮（团队已有人手）：直接派给执行者
+  if (toolNames.has('org_assign') && typeof Org !== 'undefined') {
+    const subs = Org.descendants(me.id).filter((a) => a.role === 'worker');
+    if (subs.length) {
+      return {
+        text: '任务交给执行者处理。\n\n',
+        thinking: '这个需求适合直接派给执行者，做完再请检查者验收。',
+        toolCalls: [{
+          id: uid('call'), name: 'org_assign', arguments: {
+            targetId: subs[0].id,
+            task: String((lastUser && lastUser.content) || '').slice(0, 900) + '\n\n请产出可直接交付的中文结果。'
+          }
+        }]
+      };
+    }
+  }
+
+  // 执行者：没有 org 权限就用普通话术
+  return {
+    text: `我是「${me.name}」，负责：${me.brief || '执行分配到的任务'}。\n\n当前演示模型只做流程演示，接到任务会说明收到。换成真实模型（⚙ → 模型）后，这里会是真实产出。`,
+    toolCalls: []
+  };
+}
 
 /* ===== 03-tools.js ===== */
 /* ============ 03 工具注册表 + 搜索 / 抓取 / 沙箱 ============ */
@@ -3979,6 +4547,29 @@ const UI = {
     toast('沙箱内脚本报错：' + truncate(String(msg), 80), 'err', 4000);
   },
 
+  /** 顶栏模式 chip：单 Agent / 企业团队 */
+  updateModeChip() {
+    const chip = $('#modeChip');
+    if (!chip) return;
+    const on = !!(State.org && State.org.enabled);
+    const txt = $('#modeChipText');
+    const n = (State.org && State.org.nodes) ? State.org.nodes.filter((x) => x.role !== 'inspector').length : 0;
+    if (txt) txt.textContent = on ? '企业团队' + (n ? ` · ${n} 人` : '') : '单 Agent';
+    chip.classList.toggle('on', on);
+    chip.title = on ? '当前：企业式多 Agent 团队（点击切回单 Agent）' : '当前：单 Agent（点击切换到企业团队模式）';
+    const oc = $('#orgCount');
+    if (oc) oc.textContent = n ? String(n) : '';
+  },
+
+  /** 组织变动时刷新徽标与面板 */
+  orgChanged() {
+    this.updateModeChip();
+    const n = (State.org && State.org.nodes) ? State.org.nodes.length : 0;
+    const a = $('#orgCount');
+    if (a) { a.textContent = n ? String(n) : ''; a.style.display = n ? '' : 'none'; }
+    if (typeof OrgUI !== 'undefined') { try { OrgUI.render(); } catch { } }
+  },
+
   updateMemoryBadge() {
     const n = (typeof Memory !== 'undefined') ? Memory.count() : 0;
     const a = $('#memCount');
@@ -4025,8 +4616,21 @@ const UI = {
       ['画张图', '画一张 1–5 月销售额与成本的折线图']
     ];
     const fill = (p) => { const ta = $('#prompt'); ta.value = p; autoGrow(ta); ta.focus(); ta.setSelectionRange(p.length, p.length); };
+    const on = !!(State.org && State.org.enabled);
     return el('div', { class: 'empty' },
-      el('h2', { text: '今天想做什么？' }),
+      el('h2', { text: on ? '把目标交给团队' : '今天想做什么？' }),
+      on
+        ? null
+        : el('button', {
+            class: 'org-cta',
+            onclick: () => { $('#modeChip').click(); },
+            title: '领导拆解任务、分派给小领导与执行者，每份产出都要过独立检查者'
+          },
+          el('span', { class: 'org-cta-ico', html: Icons.flow ? Icons.flow(18) : '' }),
+          el('span', { class: 'org-cta-tx' },
+            el('b', { text: '开启企业模式' }),
+            el('span', { text: '多个 Agent 分工协作：大领导拆解 → 小领导分派 → 执行者交付 → 检查者审核' })),
+          el('span', { class: 'org-cta-go', text: '→' })),
       el('div', { class: 'pills' }, briefs.map(([t, p]) => el('button', { onclick: () => fill(p), title: p }, t))));
   },
 
@@ -4092,12 +4696,20 @@ const UI = {
     // 工具调用：一行摘要，默认收起
     if (n > 0) {
       const inner = el('div', { class: 'inner' });
-      calls.forEach((c, idx) => {
-        const t = tools[idx] || {};
-        inner.append(this.stepNode({ name: c.name, args: c.arguments, state: t.ok === false ? 'err' : 'ok', ms: t.ms }));
+      // 按位置配对「调用」与「结果」；结果多于调用时（历史数据）也要渲染出来
+      const maxN = Math.max(calls.length, tools.length);
+      for (let i2 = 0; i2 < maxN; i2++) {
+        const c = calls[i2] || null;
+        const t = tools[i2] || {};
+        const name = (c && c.name) || t.name || '工具';
+        if (calls.length) {
+          inner.append(this.stepNode({ name, args: (c && c.arguments) || {}, state: t.ok === false ? 'err' : 'ok', ms: t.ms }));
+        }
         const d = t.display;
-        if (d && !this.isDirectDisplay(d)) inner.append(this.displayNode(d, t));
-      });
+        if (d && !this.isDirectDisplay(d)) {
+          inner.append(this.withOrgAction(this.displayNode(d, t), name, t.content, d));
+        }
+      }
       body.append(el('details', { class: 'steps' },
         el('summary', {}, el('span', { class: 'stxt', text: this.stepsLabel(n, totalMs, failed) })), inner));
     }
@@ -4114,7 +4726,7 @@ const UI = {
             // 临时压制自动运行
           }
         }
-        viz.append(this.displayNode(m.display, m));
+        viz.append(this.withOrgAction(this.displayNode(m.display, m), m.name || '工具', m.content, m.display));
       }
       body.append(viz);
     }
@@ -4148,7 +4760,7 @@ const UI = {
   },
   /** 可视输出：图表 / 流程图 / 图片 / 沙箱演示，应当直接可见（用户要看的成果，不是日志） */
   isVisualDisplay(d) {
-    return d && ['chart', 'mermaid', 'images', 'frame'].includes(d.kind);
+    return d && ['chart', 'mermaid', 'images', 'frame', 'orgtree', 'orgdeliver', 'orgreview', 'orgmsg'].includes(d.kind);
   },
   /** 既不进折叠区、也不用放进产物条的输出 */
   isDirectDisplay(d) {
@@ -4348,16 +4960,6 @@ const UI = {
       for (const a of d.items) card.append(this.artifactNode(a));
       return card;
     }
-    if (kind === 'delegate') {
-      return el('div', { class: 'toolcard' },
-        el('div', { class: 'hd' }, el('b', { text: '子 Agent 结论' }), el('span', { class: 'badge', text: (d.trace || []).length + ' 步' })),
-        el('div', { class: 'md', html: MD.render(d.answer || '') }),
-        el('details', { style: 'margin-top:6px' }, el('summary', { style: 'font-size:12px;color:var(--dim)', text: '子 Agent 轨迹' }),
-          el('pre', { style: 'font-size:11px;overflow:auto;max-height:200px', text: JSON.stringify(d.trace, null, 2) })));
-    }
-    if (kind === 'denied') {
-      return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: '⚠ 已跳过工具 ' + d.name + '（用户拒绝）' }));
-    }
     if (kind === 'memory') {
       const card = el('div', { class: 'toolcard' }, el('div', { class: 'hd' },
         el('b', { text: d.action === 'search' ? '长期记忆检索' : d.action === 'clear' ? '已清空记忆' : d.action === 'remove' ? '已删除记忆' : '已记住' }),
@@ -4366,7 +4968,10 @@ const UI = {
       for (const it of items) card.append(el('div', { class: 'memrow' },
         el('span', { class: 'memdot' }),
         el('span', { class: 'memtxt', text: it.text }),
-        d.action === 'search' ? null : el('button', { class: 'btn sm ghost', text: '删除', onclick: () => { Memory.remove(it.id); card.remove(); UI.updateMemoryBadge(); toast('已删除'); } })));
+        d.action === 'search' ? null : el('button', {
+          class: 'btn sm ghost', text: '删除',
+          onclick: () => { Memory.remove(it.id); card.remove(); UI.updateMemoryBadge(); toast('已删除'); }
+        })));
       if (!items.length) card.append(el('div', { class: 'hint', text: '没有匹配的记忆' }));
       return card;
     }
@@ -4395,7 +5000,7 @@ const UI = {
           el('span', { style: 'flex:1' }),
           el('span', { class: 'badge', text: d.mode === 'replace' ? '整文件覆盖' : '精确替换' })));
       const dv = el('div', { class: 'diff' });
-      d.diff.rows.forEach((r) => dv.append(el('div', { class: 'dl ' + (r.t === '+' ? 'add' : r.t === '-' ? 'del' : '') },
+      (d.diff.rows || []).forEach((r) => dv.append(el('div', { class: 'dl ' + (r.t === '+' ? 'add' : r.t === '-' ? 'del' : '') },
         el('span', { class: 'ln', text: r.n }), el('span', { class: 'sg', text: r.t === ' ' ? '' : r.t }), el('span', { class: 'tx', text: r.s }))));
       card.append(dv);
       const btn = el('button', { class: 'btn primary', text: '写入文件', onclick: async (e) => {
@@ -4423,8 +5028,71 @@ const UI = {
         } })));
       return card;
     }
-    if (kind === 'file') return el('div', { class: 'toolcard' }, this.artifactNode(d.art));
+    if (kind === 'delegate') {
+      return el('div', { class: 'toolcard' },
+        el('div', { class: 'hd' }, el('b', { text: '子 Agent 结论' }), el('span', { class: 'badge', text: (d.trace || []).length + ' 步' })),
+        el('div', { class: 'md', html: MD.render(d.answer || '') }),
+        el('details', { style: 'margin-top:6px' }, el('summary', { style: 'font-size:12px;color:var(--dim)', text: '子 Agent 轨迹' }),
+          el('pre', { style: 'font-size:11px;overflow:auto;max-height:200px', text: JSON.stringify(d.trace, null, 2) })));
+    }
+    if (kind === 'denied') {
+      return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: '⚠ 已跳过工具 ' + d.name + '（用户拒绝）' }));
+    }
+    if (kind === 'orgtree') {
+      const nodes = (State.org && State.org.nodes) ? State.org.nodes : [];
+      const card = el('div', { class: 'toolcard' },
+        el('div', { class: 'hd' }, el('b', { text: '组织结构' }),
+          el('span', { class: 'badge', text: nodes.length + ' 人' }), el('span', { style: 'flex:1' }),
+          el('button', { class: 'btn sm ghost', text: '打开面板', onclick: () => OrgUI.applyMode(true) })));
+      for (const a of nodes) {
+        const d = Org.depth(a.id);
+        card.append(el('div', { class: 'memrow' },
+          el('span', { class: 'orgindent', style: `width:${d * 14}px` }),
+          el('span', { class: 'memdot', style: a.role === 'inspector' ? 'background:var(--warn)' : '' }),
+          el('span', { class: 'memtxt', text: `${a.name}（${ORG_ROLES[a.role] ? ORG_ROLES[a.role].label : a.role}）` }),
+          el('span', { class: 'badge', text: ({ idle: '待命', running: '执行中', done: '完成', blocked: '未通过', error: '出错' })[a.status] || a.status })));
+      }
+      return card;
+    }
     return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: (m && m.name) || '工具结果' }));
+  },
+
+  /** 把工具结果作为材料交给团队（企业模式） */
+  sendToolToOrg(name, text, display) {
+    if (typeof OrgUI === 'undefined') return;
+    // 优先用结构化展示内容（比模型看到的截断文本更完整、更好读）
+    let body = '';
+    if (display) {
+      if (display.kind === 'search' && display.results) {
+        body = `搜索「${display.query || ''}」（${display.provider || ''}）结果：\n\n` +
+          display.results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet || ''}`).join('\n\n');
+      } else if (display.kind === 'fetch') {
+        body = `抓取 ${display.url || ''}\n\n${display.text || ''}`;
+      } else if (display.kind === 'code') {
+        body = `代码：\n${display.code || ''}\n\n结果：\n${display.result || display.error || ''}`;
+      } else if (display.kind === 'kb' && display.hits) {
+        body = display.hits.map((h, i) => `[${i + 1}] ${h.docName} #${h.idx}\n${h.text}`).join('\n\n');
+      }
+    }
+    if (!body) body = String(text || '');
+    if (!body && display) body = JSON.stringify(display).slice(0, 8000);
+    OrgUI.attachText(`${name} 返回结果`, body, 'tool');
+    if (!(State.org && State.org.enabled)) $('#modeChip').click();
+    setTimeout(() => { const g = $('#orgGoal'); if (g) g.focus(); }, 200);
+    toast('已作为材料附加，写清目标后点发送即可交给团队', 'ok', 3200);
+  },
+
+  /** 给任意工具卡片挂上「交给团队」入口 */
+  withOrgAction(card, name, text, display) {
+    if (!card || !card.classList || !card.classList.contains('toolcard')) return card;
+    const hd = card.querySelector('.hd');
+    if (!hd || hd.querySelector('.org-send')) return card;
+    hd.append(el('span', { style: 'flex:1' }), el('button', {
+      class: 'org-send', title: '把这份结果作为材料交给团队',
+      html: (Icons.flow ? Icons.flow(12) : '') + '<span>交给团队</span>',
+      onclick: (e) => { e.stopPropagation(); this.sendToolToOrg(name, text, display); }
+    }));
+    return card;
   },
 
   /** 产物按钮统一入口：点击时给视觉反馈，避免「点了没反应」 */
@@ -4928,6 +5596,8 @@ const App = {
     });
     this.setThemeIcon(State.settings.theme);
     $('#btnSettings').addEventListener('click', () => Drawer.open('model'));
+    // 顶栏模式切换：单 Agent ⇄ 企业团队
+    $('#modeChip').addEventListener('click', () => this.toggleOrgMode());
     // 更多菜单
     const menu = $('#moreMenu');
     $('#btnMore').addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('open'); UI.updateMemoryBadge(); });
@@ -4935,6 +5605,7 @@ const App = {
     menu.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => {
       menu.classList.remove('open');
       const k = b.dataset.m;
+      if (k === 'org') OrgUI.applyMode(true);
       if (k === 'memory') Drawer.open('memory');
       if (k === 'spec') Drawer.open('spec');
       if (k === 'export') this.exportMenu();
@@ -4949,6 +5620,10 @@ const App = {
     // 用量条 & 状态
     UI.updateHeader();
     UI.updateMemoryBadge();
+    // 恢复上次的模式，并初始化企业面板
+    OrgUI.init();
+    if (State.org && State.org.enabled) OrgUI.applyMode(true);
+    UI.updateModeChip();
     // 规格面板等首次渲染
     Drawer.init();
     // 欢迎
@@ -4969,6 +5644,26 @@ const App = {
     if (!b) return;
     b.innerHTML = theme === 'dark' ? ICON_SUN : ICON_MOON;
     b.title = theme === 'dark' ? '切换到浅色' : '切换到深色';
+  },
+
+  /** 切换企业式多 Agent 模式 */
+  toggleOrgMode() {
+    const next = !(State.org && State.org.enabled);
+    if (next) {
+      Org.data.enabled = true;
+      Org.save();
+      // 首次进入：保证有最简可用的团队（领导 + 检查者已由 defaults 提供）
+      if (!Org.validate().ok) { try { Org.data = Org.defaults(); Org.save(); } catch { } }
+      OrgUI.applyMode(true);
+      UI.updateModeChip();
+      toast('已开启企业模式：目标交给大领导，由它拆解、派活、请检查者验收', 'ok', 4000);
+    } else {
+      Org.data.enabled = false; Org.save();
+      OrgUI.applyMode(false);
+      UI.updateModeChip();
+      toast('已切回单 Agent 模式');
+      UI.renderMessages();
+    }
   },
 
   /* ---------------- 移动端侧栏开合 ---------------- */
@@ -5156,6 +5851,11 @@ const SPEC = [
   ['A10', '长期记忆', 'done', '跨会话事实库（localStorage）；每轮自动注入系统提示摘要；remember/recall/forget 三个工具可读写；设置 → 记忆 可手动增删改、批量导入'],
   ['B6', '本机文件读写', 'done', 'File System Access API：用户点选授权后可读可改；local_read_file / local_write_file（patch 精确替换，先出差异预览，点按钮才落盘）/ local_save_as；二进制与未授权一律拒绝'],
   ['A11', '工具调用折叠行', 'done', '一个回合的全部工具调用合并为一行摘要「N 个工具调用 · 时长 · 失败数」，默认折叠，点开看参数与结果卡片'],
+  ['A12', '企业式子 Agent 编排', 'done', '大领导→小领导→执行者可嵌套（上限 4 层）；每层有独立上下文与工具集；领导通过 dispatch_task 分派、下级结果回流；支持 ask_user 直接问用户'],
+  ['A13', '完全公正的检查者', 'done', '评审标准 6 条硬编码在代码里（质量检查员 prompt 不读组织配置，任何角色改不了）；不能删最后一名；不调用任何工具避免被带偏；分数低于 70 即使模型判 pass 也强制降级为 reject；解析失败一律按不通过'],
+  ['A14', '打回重做闭环', 'done', '每份产出必过检查者；不合格把 mustFix 作为下一轮输入重做，默认最多 2 次；用尽后标记未通过但仍上报，不假装完成'],
+  ['A15', 'Agent 实时通信', 'done', '统一消息总线，任意成员可互发（含广播 all）；收件箱带未读标记，下次工作时注入上下文；消息可携带附件（工具结果 / 上传内容）'],
+  ['A16', '材料随任务下发', 'done', '支持上传文件或把任意工具结果（搜索、抓取、代码、知识库）一键「交给团队」，作为附件随任务逐层传给下级'],
   ['O1', '本地 shell / cmd / PowerShell', 'no', '浏览器沙箱不允许'],
   ['O2', '任意读写本地文件系统', 'no', '只能用户主动选择文件'],
   ['O3', '模拟鼠标键盘、控制其他应用', 'no', '纯单文件 HTML 做不到'],
@@ -6062,6 +6762,13 @@ const Icons = {
   brain(s = 14) { return this._wrap('<path d="M9.5 4.5a2.7 2.7 0 0 0-2.7 2.7 2.4 2.4 0 0 0-1.4 4.3A2.6 2.6 0 0 0 6.9 16a2.6 2.6 0 0 0 2.6 2.2V4.5z"/><path d="M14.5 4.5a2.7 2.7 0 0 1 2.7 2.7 2.4 2.4 0 0 1 1.4 4.3A2.6 2.6 0 0 1 17.1 16a2.6 2.6 0 0 1-2.6 2.2V4.5z"/>', s, 1.4); },
   tool(s = 13) { return this._wrap('<path d="M14.5 5.5a3.5 3.5 0 0 1 4.7 4.7l-8.5 8.5-2.9.6.6-2.9z"/><path d="M5 6l2.2 2.2"/>', s, 1.5); },
   memory(s = 14) { return this._wrap('<path d="M12 3.5c-3 0-4.5 1.8-4.5 4 0 1.3.4 2.2-.6 3.4-1 1.2-1.4 2.3-1.4 3.4 0 2.4 2.2 4.2 4.5 4.2h4c2.3 0 4.5-1.8 4.5-4.2 0-1.1-.4-2.2-1.4-3.4-1-1.2-.6-2.1-.6-3.4 0-2.2-1.5-4-4.5-4z"/><path d="M9.5 20v-4.5M14.5 20v-4.5"/>', s, 1.4); },
+  // 企业模式
+  crown(s = 14) { return this._wrap('<path d="M4 8l3.2 3L12 5l4.8 6L20 8l-1.4 8.5H5.4z"/><path d="M5.4 19h13.2"/>', s, 1.5); },
+  lead(s = 14) { return this._wrap('<circle cx="12" cy="7.5" r="2.8"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/>', s, 1.6); },
+  worker(s = 14) { return this._wrap('<rect x="4" y="6.5" width="16" height="12" rx="2"/><path d="M9 6.5V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1.5"/><path d="M4 12h16"/>', s, 1.5); },
+  shield(s = 14) { return this._wrap('<path d="M12 3.5l7 2.5v5.5c0 4-3 7.2-7 8.5-4-1.3-7-4.5-7-8.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>', s, 1.5); },
+  mail(s = 14) { return this._wrap('<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>', s, 1.5); },
+  flow(s = 14) { return this._wrap('<rect x="9" y="3" width="6" height="4.5" rx="1.2"/><rect x="3" y="16.5" width="6" height="4.5" rx="1.2"/><rect x="15" y="16.5" width="6" height="4.5" rx="1.2"/><path d="M12 7.5v4M6 16.5v-2.2a1.3 1.3 0 0 1 1.3-1.3h9.4a1.3 1.3 0 0 1 1.3 1.3v2.2"/>', s, 1.5); },
   check(s = 13) { return this._wrap('<path d="M5 12.5l4.5 4.5L19 7"/>', s, 2); },
   alert(s = 13) { return this._wrap('<circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 16.2v.1"/>', s, 1.6); }
 };
@@ -6559,6 +7266,1228 @@ async function openArtifact(art) {
 /** 判断某个产物现在能不能下载（用于 UI 置灰） */
 function artifactReady(art) {
   return !!(art && (art.blob instanceof Blob));
+}
+
+/* ===== 18-org.js ===== */
+/* ============ 18 企业式子 Agent：组织模型 / 通信总线 / 检查者 / 运行引擎 ============ */
+/* 设计要点
+   · 层级：大领导（1 个，可多个小领导）→ 小领导（可再挂小领导或执行者）→ 执行者
+   · 检查者：独立于指挥链，数量 >= 1，评审标准写死在代码里，领导改不了也删不掉
+   · 通信：所有 agent 共用一个消息总线，可随时互发；消息带附件（工具结果 / 上传内容）
+   · 每个 agent 有独立上下文（自己的 messages），互相不污染
+*/
+
+const ORG_ROLES = {
+  leader: { label: '大领导', icon: 'crown', canDelegate: true, level: 0 },
+  subleader: { label: '小领导', icon: 'lead', canDelegate: true, level: 1 },
+  worker: { label: '执行者', icon: 'worker', canDelegate: false, level: 2 },
+  inspector: { label: '检查者', icon: 'shield', canDelegate: false, level: 0 }
+};
+
+/* ---------------- 组织数据模型 ---------------- */
+const Org = {
+  get data() {
+    if (!State.org) State.org = this.defaults();
+    return State.org;
+  },
+  defaults() {
+    return {
+      enabled: false,
+      nodes: [
+        this.makeNode({ id: 'leader', name: '大领导', role: 'leader', parentId: null, prompt: '你负责接收目标、拆解任务、分派给下级，并对最终交付负责。要明确验收标准。' }),
+        this.makeNode({ id: 'sub1', name: '小领导', role: 'subleader', parentId: 'leader', prompt: '你负责把上级分派的任务再拆成可执行的子任务，交给执行者，并把结果整合后上报。' }),
+        this.makeNode({ id: 'w1', name: '执行者 A', role: 'worker', parentId: 'sub1', prompt: '你是执行者，专注把交给你的具体任务做完，给出可直接使用的结果。' }),
+        this.makeNode({ id: 'w2', name: '执行者 B', role: 'worker', parentId: 'sub1', prompt: '你是执行者，专注把交给你的具体任务做完，给出可直接使用的结果。' }),
+        this.makeNode({ id: 'insp1', name: '检查者', role: 'inspector', parentId: null, prompt: '' })
+      ],
+      seq: 5,
+      maxDepth: 4,
+      maxRework: 2,        // 被检查者打回后最多重做几次
+      maxStepsPerAgent: 4  // 单个 agent 最多几轮工具调用
+    };
+  },
+  makeNode(o = {}) {
+    const role = o.role || 'worker';
+    return {
+      id: o.id || uid('n'),
+      name: o.name || (ORG_ROLES[role] ? ORG_ROLES[role].label : '成员'),
+      role,
+      parentId: o.parentId === undefined ? null : o.parentId,
+      prompt: o.prompt != null ? o.prompt : '',
+      model: o.model || '',            // 留空用全局设置
+      expanded: o.expanded !== false,
+      status: 'idle',                  // idle | running | done | error | blocked
+      lastActive: 0
+    };
+  },
+  save() { Store.set('org', this.data); },
+
+  all() { return this.data.nodes; },
+  get(id) { return this.data.nodes.find((n) => n.id === id) || null; },
+  leaders() { return this.data.nodes.filter((n) => n.role === 'leader' && !n.parentId); },
+  rootLeader() { return this.leaders()[0] || null; },
+  inspectors() { return this.data.nodes.filter((n) => n.role === 'inspector'); },
+  childrenOf(id) { return this.data.nodes.filter((n) => n.parentId === id); },
+  /** 指挥链（不含检查者） */
+  chain() { return this.data.nodes.filter((n) => n.role !== 'inspector'); },
+
+  /** 深度（领导 = 0） */
+  depth(id) {
+    let d = 0, cur = this.get(id), guard = 0;
+    while (cur && cur.parentId && guard++ < 20) { d++; cur = this.get(cur.parentId); }
+    return d;
+  },
+  path(id) {
+    const out = []; let cur = this.get(id), guard = 0;
+    while (cur && guard++ < 20) { out.unshift(cur); cur = cur.parentId ? this.get(cur.parentId) : null; }
+    return out;
+  },
+
+  add(opts) {
+    const parent = opts.parentId ? this.get(opts.parentId) : null;
+    if (opts.parentId && !parent) throw new Error('找不到上级');
+    if (parent && !ORG_ROLES[parent.role].canDelegate) throw new Error(`${ORG_ROLES[parent.role].label}不能有下属`);
+    if (parent && parent.role === 'inspector') throw new Error('检查者不参与指挥链');
+    const d = parent ? this.depth(parent.id) + 1 : 0;
+    if (d >= this.data.maxDepth) throw new Error(`层级超过上限（${this.data.maxDepth} 层）`);
+    const n = this.makeNode(Object.assign({}, opts, { parentId: parent ? parent.id : null }));
+    this.data.nodes.push(n);
+    this.save();
+    return n;
+  },
+  update(id, patch) {
+    const n = this.get(id);
+    if (!n) return null;
+    // 检查者的名字可以改，但评审标准在代码里，这里改不了
+    Object.assign(n, patch);
+    this.save();
+    return n;
+  },
+  remove(id) {
+    const n = this.get(id);
+    if (!n) return false;
+    if (n.role === 'leader' && !n.parentId) throw new Error('大领导不能被删除');
+    if (n.role === 'inspector' && this.inspectors().length <= 1) throw new Error('至少要保留一名检查者');
+    // 连同子树一起删
+    const kill = new Set([id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const x of this.data.nodes) {
+        if (x.parentId && kill.has(x.parentId) && !kill.has(x.id)) { kill.add(x.id); grew = true; }
+      }
+    }
+    this.data.nodes = this.data.nodes.filter((x) => !kill.has(x.id));
+    OrgBus.purgeAgents([...kill]);
+    this.save();
+    return true;
+  },
+  /** 依赖检查：能否开始运行 */
+  validate() {
+    const errs = [];
+    if (!this.rootLeader()) errs.push('缺少大领导');
+    if (!this.inspectors().length) errs.push('必须至少有一名检查者');
+    for (const n of this.chain()) {
+      if (ORG_ROLES[n.role].canDelegate && n.id !== 'leader') {
+        // 允许领导没有下属（会被当成执行者用），只提示
+      }
+    }
+    return { ok: errs.length === 0, errs };
+  },
+  resetRun() {
+    for (const n of this.data.nodes) { n.status = 'idle'; n.lastActive = 0; }
+    this.save();
+  }
+};
+
+/* ---------------- 通信总线：Agent 之间实时互发 ---------------- */
+const OrgBus = {
+  list() { return (State.orgBus || []).slice(); },
+  save() { Store.set('orgBus', (State.orgBus || []).slice(-400)); },
+
+  /**
+   * 发消息
+   * @param {string} from 发送者 id（'user' 表示人）
+   * @param {string|'all'} to 接收者 id
+   * @param {object} opt { subject, body, attachments:[{name, kind, text, chars}], kind }
+   */
+  send(from, to, opt = {}) {
+    if (!State.orgBus) State.orgBus = [];
+    const msg = {
+      id: uid('m'),
+      from, to,
+      subject: String(opt.subject || '').slice(0, 200),
+      body: String(opt.body || ''),
+      attachments: (opt.attachments || []).map((a) => ({
+        name: a.name || '附件', kind: a.kind || 'text',
+        chars: a.chars != null ? a.chars : (a.text ? a.text.length : 0),
+        text: String(a.text || '').slice(0, 20000)
+      })),
+      kind: opt.kind || 'message',      // message | dispatch | report | review
+      ts: Date.now(),
+      readBy: []
+    };
+    State.orgBus.push(msg);
+    if (State.orgBus.length > 400) State.orgBus = State.orgBus.slice(-400);
+    this.save();
+    this.emit(msg);
+    return msg;
+  },
+
+  /** 取某个 agent 的收件箱 */
+  inboxOf(id, { unreadOnly = false, limit = 20 } = {}) {
+    return this.list()
+      .filter((m) => (m.to === id || m.to === 'all') && m.from !== id)
+      .filter((m) => !unreadOnly || !m.readBy.includes(id))
+      .slice(-limit);
+  },
+  markRead(id, ids) {
+    const set = new Set(ids || this.list().map((m) => m.id));
+    for (const m of this.list()) if (set.has(m.id) && !m.readBy.includes(id)) m.readBy.push(id);
+    this.save();
+  },
+  unreadCount(id) { return this.inboxOf(id, { unreadOnly: true, limit: 999 }).length; },
+
+  /** 把收件箱渲染成给模型看的文本（把附件正文也带上） */
+  renderInbox(id, limit = 8) {
+    const msgs = this.inboxOf(id, { unreadOnly: true, limit });
+    if (!msgs.length) return '';
+    const nameOf = (aid) => (aid === 'user' ? '用户' : (Org.get(aid) ? Org.get(aid).name : aid));
+    return msgs.map((m) => {
+      let line = `【来自 ${nameOf(m.from)}｜${m.kind}】${m.subject ? m.subject + '：' : ''}${m.body}`;
+      for (const a of m.attachments) {
+        line += `\n  ▸ 附件《${a.name}》：${truncate(a.text, 1500)}`;
+      }
+      return line;
+    }).join('\n\n');
+  },
+
+  purgeAgents(ids) {
+    const set = new Set(ids);
+    State.orgBus = this.list().filter((m) => !set.has(m.from) && !set.has(m.to));
+    this.save();
+  },
+  clear() { State.orgBus = []; this.save(); this.emit(null); },
+
+  _subs: new Set(),
+  subscribe(fn) { this._subs.add(fn); return () => this._subs.delete(fn); },
+  emit(msg) { for (const fn of this._subs) { try { fn(msg); } catch { } } }
+};
+
+/* ---------------- 检查者：评审标准写死在代码里，领导改不了 ---------------- */
+/* 这是「完全公正」的实现方式：
+   · 评审用的 system prompt 是下面的常量，不读节点的 prompt 字段
+   · 检查者不能被删除（至少保留 1 名）
+   · 检查者不接收领导的分派指令，只接收待审内容
+   · 评审结论带打分与必须修改项，打回必须给出可执行理由
+*/
+const Inspector = {
+  CRITERIA: [
+    '1. 是否真正回答了被分派的任务，而不是答非所问或泛泛而谈',
+    '2. 关键事实是否有依据（引用、数据、工具结果），有没有编造',
+    '3. 交付物是否完整可用（该有的部分是否都在，格式是否可用）',
+    '4. 有没有明显的逻辑错误、自相矛盾、单位/数字错误',
+    '5. 是否遵守了任务里写明的约束（范围、口径、格式要求）',
+    '6. 有没有把没做完的事说成做完了'
+  ],
+
+  /** 硬编码的评审指令：任何界面操作都改不到这里 */
+  SYSTEM_PROMPT() {
+    return [
+      '你是一名独立的质量检查员，与被检查的下属没有任何隶属关系，也不受其上级影响。',
+      '你的唯一职责是判断交付物是否合格，并且必须保持公正：',
+      '· 不因为任务看起来简单就放松标准，也不因为交付物很长就给高分',
+      '· 只依据任务要求与交付内容本身判断，不看是谁做的',
+      '· 交付物有问题时必须明确指出，并给出可以照着改的具体意见',
+      '',
+      '评审标准：',
+      this.CRITERIA.join('\n'),
+      '',
+      '严格按下面的 JSON 输出，不要输出任何其它内容：',
+      '{"verdict":"pass"|"reject","score":0-100,"reasons":["..."],"mustFix":["..."]}',
+      'score < 70 或存在实质性缺陷时必须 reject，并在 mustFix 里写清要改什么。'
+    ].join('\n');
+  },
+
+  /** 同一次评审用哪个节点（多个检查者时轮询，避免总用同一个） */
+  pick(excludeIds = []) {
+    const all = Org.inspectors().filter((n) => !excludeIds.includes(n.id));
+    const pool = all.length ? all : Org.inspectors();
+    if (!pool.length) return null;
+    this._rr = ((this._rr || 0) + 1) % pool.length;
+    return pool[this._rr];
+  },
+
+  async review({ task, output, context, inspectorId }) {
+    const who = inspectorId ? Org.get(inspectorId) : this.pick();
+    if (!who) return { verdict: 'pass', score: 100, reasons: ['未配置检查者，跳过审核'], mustFix: [], skipped: true };
+
+    const payload = [
+      '【被分派的任务】',
+      task || '(未填写)',
+      '',
+      context ? '【任务背景】\n' + context + '\n' : '',
+      '【待审交付内容】',
+      truncate(String(output || ''), 12000),
+      '',
+      '请给出评审结论（只输出 JSON）。'
+    ].filter(Boolean).join('\n');
+
+    let raw = '';
+    try {
+      const res = await LLM.chat({
+        messages: [
+          { role: 'system', content: this.SYSTEM_PROMPT() },
+          { role: 'user', content: payload }
+        ],
+        tools: [],                     // 检查者不调用任何工具，避免被工具结果带偏
+        signal: State.abort ? State.abort.signal : undefined
+      });
+      raw = res.text || '';
+      State.usage.inTok += res.usage.in || 0;
+      State.usage.outTok += res.usage.out || 0;
+      State.usage.calls++;
+    } catch (e) {
+      return { verdict: 'error', score: 0, reasons: ['检查者调用失败：' + e.message], mustFix: ['请检查模型配置后重试'], inspectorId: who.id };
+    }
+
+    const parsed = this.parse(raw);
+    parsed.inspectorId = who.id;
+    parsed.raw = truncate(raw, 600);
+    return parsed;
+  },
+
+  /** 容错解析：模型可能带 ```json 包裹或多说几句 */
+  parse(raw) {
+    const text = String(raw || '');
+    let json = null;
+    const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+    const candidates = [fence && fence[1], text].filter(Boolean);
+    for (const c of candidates) {
+      const m = /\{[\s\S]*\}/.exec(c);
+      if (!m) continue;
+      try { json = JSON.parse(m[0]); break; } catch { }
+    }
+    if (!json || typeof json !== 'object') {
+      // 解析不出来：按不通过处理，但标出原因，避免"假通过"
+      return { verdict: 'reject', score: 0, reasons: ['检查者返回的不是可解析的 JSON'], mustFix: ['请检查者重新评审'], unparsed: true };
+    }
+    const verdict = String(json.verdict || '').toLowerCase() === 'pass' ? 'pass' : 'reject';
+    const score = Math.max(0, Math.min(100, Number(json.score) || 0));
+    const reasons = Array.isArray(json.reasons) ? json.reasons.map(String) : (json.reasons ? [String(json.reasons)] : []);
+    const mustFix = Array.isArray(json.mustFix) ? json.mustFix.map(String) : [];
+    // 分数过低时即使模型说 pass 也按 reject 处理（防止放水）
+    const finalVerdict = (verdict === 'pass' && score >= 70) ? 'pass' : 'reject';
+    return { verdict: finalVerdict, score, reasons, mustFix, downgraded: verdict === 'pass' && finalVerdict === 'reject' };
+  }
+};
+
+/* ---------------- 运行引擎 ---------------- */
+const OrgRuntime = {
+  running: false,
+  abortFlag: false,
+  trace: [],            // 本次运行的完整轨迹（UI 实时展示）
+  hooks: {},            // UI 注入
+  _budget: {},
+
+  /** 子 Agent 可用的工具白名单（排除需要人工确认的敏感工具） */
+  TOOL_WHITELIST: ['web_search', 'web_fetch', 'kb_search', 'render_chart', 'render_mermaid',
+    'generate_docx', 'generate_xlsx', 'generate_pptx', 'generate_pdf', 'make_html_app',
+    'list_artifacts', 'recall', 'delegate_task'],
+
+  say(ev) {
+    ev.ts = Date.now();
+    this.trace.push(ev);
+    if (this.trace.length > 600) this.trace.splice(0, 200);
+    const fn = this.hooks.onEvent;
+    if (fn) { try { fn(ev); } catch { } }
+  },
+
+  reset() {
+    this.abortFlag = false;
+    this.trace = [];
+    this._budget = {};
+    Org.resetRun();
+  },
+
+  /** 顶部入口：把目标交给大领导，直到产出最终答复 */
+  async run(goal, opts = {}) {
+    const v = Org.validate();
+    if (!v.ok) throw new Error('组织配置不完整：' + v.errs.join('；'));
+    if (this.running) throw new Error('已有任务在运行');
+    const leader = Org.rootLeader();
+    if (!leader) throw new Error('缺少大领导');
+
+    this.running = true;
+    this.reset();
+    const attachments = opts.attachments || [];
+    this.say({ type: 'start', nodeId: leader.id, text: '接收目标：' + truncate(goal, 120), attachments: attachments.map((a) => a.name) });
+
+    // 用户 → 大领导
+    OrgBus.send('user', leader.id, { subject: '新任务', body: goal, attachments, kind: 'dispatch' });
+
+    try {
+      const res = await this.runNode(leader.id, goal, {
+        attachments, depth: 0, top: true, acceptance: opts.acceptance || ''
+      });
+      this.say({ type: 'finish', nodeId: leader.id, text: '任务结束' });
+      return res;
+    } finally {
+      this.running = false;
+      Org.save();
+      if (this.hooks.onEnd) this.hooks.onEnd();
+    }
+  },
+
+  stop() { this.abortFlag = true; for (const n of Org.all()) if (n.status === 'running') n.status = 'idle'; },
+
+  /** 节点的角色 prompt（检查者走硬编码，不用这里的 prompt） */
+  buildSystemPrompt(node, ctx = {}) {
+    const boss = node.parentId ? Org.get(node.parentId) : null;
+    const subs = Org.childrenOf(node.id);
+    const subText = subs.length
+      ? subs.map((s) => `- ${s.id}｜${s.name}（${ORG_ROLES[s.role].label}）`).join('\n')
+      : '（你没有直属下级，需要自己动手完成）';
+
+    const lines = [
+      `你是「${node.name}」，一家 AI 公司里的${ORG_ROLES[node.role].label}。`,
+      boss ? `你的上级是「${boss.name}」。` : '你是最高负责人，直接对用户负责。',
+      '',
+      '【你的团队（可以直接分派的对象）】',
+      subText,
+      '',
+      '【工作方式】',
+      '· 收到任务先判断：能自己做就直接做；需要拆解就用 dispatch_task 分派给下级（会立刻执行并返回结果）。',
+      '· 分派时把「要做什么、验收标准、边界」写清楚，下级看不到你和其他人的对话。',
+      '· 你可以用 send_message 给公司里任何人（含平级、下级、上级）发消息，它不会阻塞。',
+      '· 有不明白或缺少关键信息时，用 ask_user 直接问用户。',
+      '· 最后必须给出可以直接交给上级的成品，不要写"建议你去查"这类空话。',
+      '',
+      '【硬性要求】',
+      '· 你的产出会被独立检查者审核，不合格会被打回重做。请一次性把事实、数据、交付物写清楚。',
+      '· 不确定的事要标明"未确认"，不要把猜测写成事实。',
+      '· 用中文，结构清晰。'
+    ];
+    if (node.prompt && node.prompt.trim()) {
+      lines.push('', '【上级给你的角色说明】', node.prompt.trim());
+    }
+    if (ctx.acceptance) lines.push('', '【本次任务的验收标准】', ctx.acceptance);
+    return lines.join('\n');
+  },
+
+  /** 为某个节点构造工具集 */
+  nodeTools(node) {
+    const subs = Org.childrenOf(node.id);
+    const tools = [];
+
+    if (subs.length) {
+      tools.push({
+        type: 'function',
+        function: {
+          name: 'dispatch_task',
+          description: '把子任务分派给某个直属下级，会立即执行并返回它的交付结果（已通过检查者审核）。',
+          parameters: {
+            type: 'object',
+            properties: {
+              agent_id: { type: 'string', description: '下级 id，可选值：' + subs.map((s) => s.id).join(' / ') },
+              task: { type: 'string', description: '要它做的具体事情，自包含（下级看不到你的上下文）' },
+              acceptance: { type: 'string', description: '验收标准：什么样算做完' }
+            },
+            required: ['agent_id', 'task']
+          }
+        }
+      });
+    }
+
+    tools.push({
+      type: 'function',
+      function: {
+        name: 'send_message',
+        description: '给公司里任意成员发一条消息（不阻塞，对方下次工作时能看到）。可用于同步进展、请求协助、告知结论。',
+        parameters: {
+          type: 'object',
+          properties: {
+            to: { type: 'string', description: '收件人 id，或填 all 广播' },
+            subject: { type: 'string' },
+            body: { type: 'string' }
+          },
+          required: ['to', 'body']
+        }
+      }
+    });
+
+    tools.push({
+      type: 'function',
+      function: {
+        name: 'ask_user',
+        description: '当缺少关键信息、或需要用户在多个方案里做选择时，直接向用户提问。',
+        parameters: { type: 'object', properties: { question: { type: 'string' } }, required: ['question'] }
+      }
+    });
+
+    // 基础能力：只给白名单里的
+    const base = Tools.schemas().filter((t) => this.TOOL_WHITELIST.includes(t.function.name));
+    return tools.concat(base);
+  },
+
+  /** 执行一次节点：ReAct + 审核 + 打回重做 */
+  async runNode(nodeId, task, ctx = {}) {
+    const node = Org.get(nodeId);
+    if (!node) throw new Error('节点不存在：' + nodeId);
+    if (node.role === 'inspector') throw new Error('检查者不执行任务');
+    if (this.abortFlag) return { text: '（已停止）', aborted: true };
+
+    const cfg = Org.data;
+    let attempt = 0;
+    let lastOutput = '';
+    let lastReview = null;
+    const history = [];   // 打回意见累积给下一次
+
+    while (attempt <= cfg.maxRework) {
+      if (this.abortFlag) break;
+      attempt++;
+      node.status = 'running'; node.lastActive = Date.now(); Org.save();
+      this.say({ type: 'node-start', nodeId, attempt, text: `${node.name} 开始工作${attempt > 1 ? `（第 ${attempt} 次，上一轮被打回）` : ''}` });
+
+      let out;
+      try {
+        out = await this.runAgentLoop(node, task, Object.assign({}, ctx, { rework: history, attempt }));
+      } catch (e) {
+        node.status = 'error'; Org.save();
+        this.say({ type: 'node-error', nodeId, text: `${node.name} 出错：${e.message}` });
+        throw e;
+      }
+      lastOutput = out.text || '';
+
+      // ★ 审核：检查者独立评审
+      const rev = await Inspector.review({
+        task,
+        output: lastOutput,
+        context: ctx.acceptance ? '验收标准：' + ctx.acceptance : ''
+      });
+      lastReview = rev;
+      this.say({
+        type: 'review', nodeId, inspectorId: rev.inspectorId,
+        verdict: rev.verdict, score: rev.score,
+        text: `检查者评分 ${rev.score} → ${rev.verdict === 'pass' ? '通过' : '打回'}`,
+        reasons: rev.reasons, mustFix: rev.mustFix
+      });
+
+      if (rev.verdict === 'pass' || rev.skipped) break;
+
+      if (attempt > cfg.maxRework) {
+        // 重做次数用尽：仍然上报，但标记未通过，让上级和用户看到
+        node.status = 'blocked'; Org.save();
+        this.say({ type: 'node-blocked', nodeId, text: `${node.name} 重做 ${cfg.maxRework} 次仍未通过检查，带着问题上报` });
+        break;
+      }
+      // 把打回意见作为下一轮的输入
+      history.push({ attempt, score: rev.score, mustFix: rev.mustFix, reasons: rev.reasons });
+      this.say({ type: 'node-rework', nodeId, text: `${node.name} 被打回，问题：` + truncate((rev.mustFix || []).join('；') || (rev.reasons || []).join('；'), 160) });
+    }
+
+    node.status = (lastReview && lastReview.verdict === 'pass') ? 'done' : (node.status === 'blocked' ? 'blocked' : 'done');
+    node.lastActive = Date.now(); Org.save();
+
+    return { text: lastOutput, review: lastReview, attempts: attempt, node: node.name };
+  },
+
+  /** 单个节点的 ReAct 循环 */
+  async runAgentLoop(node, task, ctx = {}) {
+    const tools = this.nodeTools(node);
+    const hasSubs = Org.childrenOf(node.id).length > 0;
+
+    // 收件箱（未读）
+    const inbox = OrgBus.renderInbox(node.id);
+    if (inbox) OrgBus.markRead(node.id, OrgBus.inboxOf(node.id, { unreadOnly: true, limit: 99 }).map((m) => m.id));
+
+    const taskText = [
+      '【当前任务】',
+      task,
+      '',
+      ctx.acceptance ? '【验收标准】\n' + ctx.acceptance + '\n' : '',
+      ctx.attachments && ctx.attachments.length
+        ? '【随任务附上的材料】\n' + ctx.attachments.map((a) => `《${a.name}》：\n${truncate(a.text, 4000)}`).join('\n\n')
+        : '',
+      inbox ? '【你的新消息】\n' + inbox : '',
+      (ctx.rework && ctx.rework.length)
+        ? '【上一版被打回，必须修复】\n' + ctx.rework.map((r) => `- 第 ${r.attempt} 版（${r.score} 分）：${(r.mustFix && r.mustFix.length ? r.mustFix : r.reasons || []).join('；')}`).join('\n')
+        : ''
+    ].filter(Boolean).join('\n');
+
+    const messages = [
+      { role: 'system', content: this.buildSystemPrompt(node, ctx) },
+      { role: 'user', content: taskText }
+    ];
+
+    const maxSteps = Number(Org.data.maxStepsPerAgent) || 4;
+    let text = '';
+
+    for (let step = 0; step < maxSteps; step++) {
+      if (this.abortFlag) break;
+      const res = await LLM.chat({
+        messages,
+        tools,
+        signal: State.abort ? State.abort.signal : undefined,
+        onDelta: (d, all) => { this.say({ type: 'delta', nodeId: node.id, text: all.slice(-80) }); }
+      });
+      State.usage.inTok += res.usage.in || 0;
+      State.usage.outTok += res.usage.out || 0;
+      State.usage.calls++;
+      text = res.text || text;
+
+      if (!res.toolCalls.length) break;
+
+      messages.push({
+        role: 'assistant', content: res.text || '',
+        tool_calls: res.toolCalls.map((c) => ({ id: c.id, name: c.name, arguments: c.arguments }))
+      });
+
+      for (const call of res.toolCalls) {
+        if (this.abortFlag) break;
+        let outText = '';
+        try {
+          outText = await this.execNodeTool(node, call, ctx);
+        } catch (e) {
+          outText = '工具执行失败：' + e.message;
+        }
+        messages.push({ role: 'tool', tool_call_id: call.id, name: call.name, content: String(outText).slice(0, 12000) });
+      }
+    }
+    return { text };
+  },
+
+  /** 节点工具的实际执行 */
+  async execNodeTool(node, call, ctx) {
+    const name = call.name;
+    const args = call.arguments || {};
+
+    if (name === 'dispatch_task') {
+      const sub = Org.get(String(args.agent_id || ''));
+      if (!sub) throw new Error('找不到这个下级：' + args.agent_id + '（可选：' + Org.childrenOf(node.id).map((s) => s.id).join('/') + '）');
+      if (sub.parentId !== node.id) throw new Error(sub.name + ' 不是你的直属下级');
+      const d = Org.depth(sub.id);
+      if (d >= Org.data.maxDepth) throw new Error('层级超限');
+
+      this.say({
+        type: 'dispatch', nodeId: node.id, to: sub.id,
+        text: `${node.name} → ${sub.name}：${truncate(args.task, 100)}`
+      });
+      OrgBus.send(node.id, sub.id, {
+        subject: '任务分派', body: String(args.task || ''), kind: 'dispatch'
+      });
+
+      const subRes = await this.runNode(sub.id, String(args.task || ''), {
+        attachments: ctx.attachments || [],
+        depth: (ctx.depth || 0) + 1,
+        acceptance: String(args.acceptance || ''),
+        top: false
+      });
+
+      OrgBus.send(sub.id, node.id, {
+        subject: '任务结果', body: truncate(subRes.text, 8000), kind: 'report'
+      });
+      this.say({
+        type: 'report', nodeId: sub.id, to: node.id,
+        text: `${sub.name} 交付给 ${node.name}（${subRes.review ? subRes.review.score + ' 分 ' + (subRes.review.verdict === 'pass' ? '通过' : '未通过') : '未审核'}）`
+      });
+
+      const rv = subRes.review;
+      return [
+        `下级「${sub.name}」的交付：`,
+        subRes.text || '(空)',
+        '',
+        rv ? `检查者评分：${rv.score}（${rv.verdict === 'pass' ? '通过' : '未通过'}）` : '',
+        rv && rv.mustFix && rv.mustFix.length ? '待改进：' + rv.mustFix.join('；') : ''
+      ].filter(Boolean).join('\n');
+    }
+
+    if (name === 'send_message') {
+      const to = String(args.to || 'all');
+      if (to !== 'all' && !Org.get(to)) throw new Error('找不到收件人：' + to);
+      OrgBus.send(node.id, to, { subject: String(args.subject || ''), body: String(args.body || ''), kind: 'message' });
+      this.say({ type: 'message', nodeId: node.id, to, text: `${node.name} → ${to === 'all' ? '全员' : Org.get(to).name}：${truncate(args.body, 80)}` });
+      return '已发送。';
+    }
+
+    if (name === 'ask_user') {
+      this.say({ type: 'ask', nodeId: node.id, text: `${node.name} 询问用户：${truncate(args.question, 150)}` });
+      if (this.hooks.onAsk) {
+        try {
+          const ans = await this.hooks.onAsk({ nodeId: node.id, question: String(args.question || '') });
+          if (ans) {
+            OrgBus.send('user', node.id, { subject: '用户的回答', body: ans, kind: 'message' });
+            return '用户回答：' + ans;
+          }
+        } catch { }
+      }
+      return '用户暂时没有回答，请按最合理的假设继续，并标注这是假设。';
+    }
+
+    // 其它基础工具
+    const out = await Tools.exec(name, args, { orgNode: node.id });
+    if (out && out.display) {
+      this.say({ type: 'tool', nodeId: node.id, name, display: out.display, text: `${node.name} 调用了 ${name}` });
+    }
+    return Tools.toToolText(out, 6000);
+  }
+};
+
+/* ===== 19-org-ui.js ===== */
+/* ============ 19 企业模式 UI：组织树 / 运行轨迹 / 消息总线 ============ */
+const OrgUI = {
+  inited: false,
+  _lastEventAt: 0,
+
+  init() {
+    if (this.inited) return;
+    this.inited = true;
+
+    // 惰性初始化组织架构：保证首次进入就有可用的团队（领导 + 小领导 + 执行者 + 检查者）
+    if (!State.org || !Array.isArray(State.org.nodes) || !State.org.nodes.length) {
+      State.org = Org.defaults();
+      Org.save();
+    }
+
+    // 模式切换由顶栏 #modeChip → App.toggleOrgMode() 负责，这里不再重复绑定
+
+    // 组织树操作
+    $('#orgAddLeader') && $('#orgAddLeader').addEventListener('click', () => this.addNodeDialog('leader'));
+    $('#orgRunBtn') && $('#orgRunBtn').addEventListener('click', () => this.startRun());
+    $('#orgStopBtn') && $('#orgStopBtn').addEventListener('click', () => {
+      OrgRuntime.stop();
+      toast('已请求停止', '');
+      this.render();
+    });
+    $('#orgResetBtn') && $('#orgResetBtn').addEventListener('click', () => {
+      Org.resetRun(); OrgRuntime.trace = []; this.render(); toast('已重置状态', 'ok');
+    });
+    $('#orgBusBtn') && $('#orgBusBtn').addEventListener('click', () => this.openBus());
+    $('#orgClearBus') && $('#orgClearBus').addEventListener('click', () => {
+      OrgBus.clear(); this.openBus(); toast('消息已清空');
+    });
+
+    // 运行轨迹订阅
+    OrgRuntime.hooks.onEvent = (ev) => this.appendEvent(ev);
+    OrgRuntime.hooks.onAsk = (q) => this.askUser(q);
+    OrgRuntime.hooks.onEnd = () => { this.render(); this.setRunningUI(false); };
+
+    // 目标输入
+    const ta = $('#orgGoal');
+    if (ta) {
+      ta.addEventListener('input', () => autoGrow(ta));
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.startRun(); }
+      });
+    }
+    const fileInput = $('#orgFile');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => { this.attachFiles(Array.from(e.target.files || [])); e.target.value = ''; });
+    }
+    const attachBtn = $('#orgAttachBtn');
+    if (attachBtn) attachBtn.addEventListener('click', () => fileInput && fileInput.click());
+
+    State.orgAttachments = [];
+
+    if (State.org && State.org.enabled) this.applyMode(true);
+  },
+
+  toggleMode() {
+    const on = !(Org.data.enabled);
+    Org.data.enabled = on;
+    Org.save();
+    this.applyMode(on);
+    toast(on ? '已进入企业模式：把目标交给大领导' : '已回到普通对话模式', 'ok', 2200);
+  },
+
+  applyMode(on) {
+    document.body.classList.toggle('org-mode', !!on);
+    // 顶栏 chip 的外观由 UI.updateModeChip() 统一维护，这里不再重复操作不存在的 #modeSwitch
+    if (on) {
+      this.render();
+      // 关键：进入企业模式时必须放上引导占位，否则中间是一大片空白
+      if (!$('#orgTrace') || !$('#orgTrace').children.length) this.clearTrace();
+      setTimeout(() => { const g = $('#orgGoal'); if (g && !g.value) g.focus(); }, 120);
+    }
+  },
+
+  setRunningUI(run) {
+    const r = $('#orgRunBtn'), s = $('#orgStopBtn');
+    if (r) { r.style.display = run ? 'none' : ''; r.disabled = run; }
+    if (s) s.style.display = run ? '' : 'none';
+    const g = $('#orgGoal');
+    if (g) g.disabled = run;
+  },
+
+  /* ---------------- 渲染组织树 ---------------- */
+  render() {
+    this.renderTree();
+    this.renderStats();
+  },
+
+  renderTree() {
+    const box = $('#orgTree');
+    if (!box) return;
+    box.innerHTML = '';
+    const leader = Org.rootLeader();
+    if (!leader) { box.append(el('div', { class: 'org-empty', text: '还没有大领导' })); return; }
+
+    const build = (node, depth) => {
+      const kids = Org.childrenOf(node.id);
+      const role = ORG_ROLES[node.role];
+      const unread = OrgBus.unreadCount(node.id);
+      const st = node.status || 'idle';
+
+      // 名字里已经包含角色名时不再重复显示（否则会出现「大领导 大领导」「执行者 A 执行者」）
+      const nm = String(node.name || '').trim();
+      const showRole = !nm.includes(role.label);
+      const row = el('div', {
+        class: `orgnode role-${node.role} st-${st}`,
+        style: `--depth:${depth}`,
+        title: `${role.label}${node.prompt ? '\n' + node.prompt.slice(0, 80) : ''}`
+      },
+        el('span', { class: 'org-dot' }),
+        el('span', { class: 'org-name', text: node.name }),
+        showRole ? el('span', { class: 'org-role', text: role.label }) : null,
+        unread ? el('span', { class: 'org-unread', text: String(unread), title: unread + ' 条未读消息' }) : null,
+        el('span', { class: 'org-acts' },
+          role.canDelegate ? el('button', {
+            class: 'org-mini', title: '添加下级', text: '+',
+            onclick: (e) => { e.stopPropagation(); this.addNodeDialog(node.role === 'leader' ? 'subleader' : 'worker', node.id); }
+          }) : null,
+          el('button', {
+            class: 'org-mini', title: '编辑', text: '⋯',
+            onclick: (e) => { e.stopPropagation(); this.editNodeDialog(node.id); }
+          }),
+          (node.role === 'leader' && !node.parentId) ? null : el('button', {
+            class: 'org-mini danger', title: '删除', text: '×',
+            onclick: (e) => {
+              e.stopPropagation();
+              try { Org.remove(node.id); this.render(); toast('已删除', 'ok'); }
+              catch (err) { toast(err.message, 'err', 4000); }
+            }
+          })));
+
+      const wrap = el('div', { class: 'orgitem' }, row);
+      if (kids.length) {
+        const kidsBox = el('div', { class: 'orgkids' });
+        for (const k of kids) kidsBox.append(build(k, depth + 1));
+        wrap.append(kidsBox);
+      }
+      return wrap;
+    };
+
+    // 指挥链
+    box.append(el('div', { class: 'org-sec', text: '指挥链' }));
+    box.append(build(leader, 0));
+
+    // 检查者（独立分组，显示"独立于指挥链"）
+    box.append(el('div', { class: 'org-sec', text: '独立监督' }));
+    const inspectors = Org.inspectors();
+    if (!inspectors.length) box.append(el('div', { class: 'org-empty', text: '缺少检查者（必须至少 1 名）' }));
+    for (const ins of inspectors) {
+      box.append(el('div', { class: 'orgitem' },
+        el('div', { class: `orgnode role-inspector st-${ins.status || 'idle'}` },
+          el('span', { class: 'org-dot' }),
+          el('span', { class: 'org-name', text: ins.name }),
+          el('span', { class: 'org-role lock', title: '评审标准由代码固定，任何角色都改不了', text: '公正' }),
+          el('span', { class: 'org-acts' },
+            el('button', { class: 'org-mini', title: '查看评审标准', text: '?', onclick: (e) => { e.stopPropagation(); this.showCriteria(); } }),
+            el('button', { class: 'org-mini', title: '重命名', text: '⋯', onclick: (e) => { e.stopPropagation(); this.editNodeDialog(ins.id, true); } }),
+            inspectors.length > 1 ? el('button', {
+              class: 'org-mini danger', text: '×', onclick: (e) => {
+                e.stopPropagation();
+                try { Org.remove(ins.id); this.render(); } catch (err) { toast(err.message, 'err'); }
+              }
+            }) : null))));
+    }
+    box.append(el('button', {
+      class: 'org-addins', text: '+ 增加检查者', onclick: () => this.addNodeDialog('inspector')
+    }));
+  },
+
+  renderStats() {
+    const box = $('#orgStats');
+    if (!box) return;
+    const chain = Org.chain();
+    const nodes = Org.all();          // 统计要含检查者，否则人数对不上
+    const running = nodes.filter((n) => n.status === 'running').length;
+    const done = nodes.filter((n) => n.status === 'done').length;
+    const blocked = nodes.filter((n) => n.status === 'blocked').length;
+    const reviews = OrgRuntime.trace.filter((e) => e.type === 'review');
+    const passed = reviews.filter((e) => e.verdict === 'pass').length;
+    const rejected = reviews.filter((e) => e.verdict !== 'pass').length;
+    box.innerHTML = '';
+    const item = (k, v, cls, tip) => box.append(el('span', { class: 'ostat ' + (cls || ''), title: tip || '' }, el('b', { text: String(v) }), el('span', { text: k })));
+    item('在编', nodes.length, '', '指挥链 + 检查者');
+    item('运行中', running, running ? 'hot' : '');
+    item('完成', done, done ? 'ok' : '');
+    blocked ? item('未通过', blocked, 'warn') : null;
+    item('审核通过', passed, passed ? 'ok' : '');
+    item('被打回', rejected, rejected ? 'warn' : '');
+    item('消息', OrgBus.list().length);
+  },
+
+  /* ---------------- 运行轨迹 ---------------- */
+  appendEvent(ev) {
+    const box = $('#orgTrace');
+    if (!box) return;
+    const empty = box.querySelector('.trace-empty');
+    if (empty) empty.remove();
+
+    const nodeName = (id) => {
+      if (!id) return '';
+      if (id === 'user') return '你';
+      const n = Org.get(id);
+      return n ? n.name : id;
+    };
+    const roleCls = (id) => { const n = Org.get(id); return n ? 'role-' + n.role : ''; };
+
+    let node = null;
+    if (ev.type === 'start') {
+      node = el('div', { class: 'tevt tevt-start' },
+        el('span', { class: 'tevt-ico', html: Icons.send(13) }),
+        el('div', { class: 'tevt-body' },
+          el('div', { class: 'tevt-hd', text: '任务开始' }),
+          el('div', { class: 'tevt-tx', text: ev.text }),
+          ev.attachments && ev.attachments.length ? el('div', { class: 'tevt-att', text: '附件：' + ev.attachments.join('、') }) : null));
+    } else if (ev.type === 'node-start') {
+      node = el('div', { class: 'tevt tevt-nodestart ' + roleCls(ev.nodeId) },
+        el('span', { class: 'tevt-ico', html: Icons.worker ? Icons.worker(13) : '' }),
+        el('div', { class: 'tevt-body' },
+          el('div', { class: 'tevt-hd' }, el('b', { text: nodeName(ev.nodeId) }), el('span', { class: 'tevt-tag', text: '开始' })),
+          el('div', { class: 'tevt-tx', text: ev.text })));
+    } else if (ev.type === 'dispatch') {
+      node = el('div', { class: 'tevt tevt-dispatch' },
+        el('span', { class: 'tevt-ico', html: Icons.lead ? Icons.lead(13) : '' }),
+        el('div', { class: 'tevt-body' },
+          el('div', { class: 'tevt-hd' },
+            el('span', { class: 'who ' + roleCls(ev.nodeId), text: nodeName(ev.nodeId) }),
+            el('span', { class: 'arrow', text: '→' }),
+            el('span', { class: 'who ' + roleCls(ev.to), text: nodeName(ev.to) })),
+          el('div', { class: 'tevt-tx', text: ev.text })));
+    } else if (ev.type === 'report') {
+      node = el('div', { class: 'tevt tevt-report' },
+        el('span', { class: 'tevt-ico', html: Icons.check(13) }),
+        el('div', { class: 'tevt-body' },
+          el('div', { class: 'tevt-hd' }, el('span', { text: ev.text })),
+          el('div', { class: 'tevt-tx', text: `交付给 ${nodeName(ev.to)}` })));
+    } else if (ev.type === 'review') {
+      const pass = ev.verdict === 'pass';
+      node = el('div', { class: 'tevt tevt-review ' + (pass ? 'pass' : 'reject') },
+        el('span', { class: 'tevt-ico', html: Icons.shield ? Icons.shield(13) : '' }),
+        el('div', { class: 'tevt-body' },
+          el('div', { class: 'tevt-hd' },
+            el('b', { text: nodeName(ev.inspectorId) }),
+            el('span', { class: 'verdict ' + (pass ? 'ok' : 'no'), text: pass ? '通过' : '打回' }),
+            el('span', { class: 'score', text: ev.score + ' 分' }),
+            el('span', { class: 'sub', text: '审核 ' + nodeName(ev.nodeId) })),
+          (ev.reasons && ev.reasons.length) ? el('div', { class: 'tevt-tx', text: ev.reasons.join('；') }) : null,
+          (ev.mustFix && ev.mustFix.length) ? el('div', { class: 'tevt-fix', text: '必须改：' + ev.mustFix.join('；') }) : null));
+    } else if (ev.type === 'node-rework') {
+      node = el('div', { class: 'tevt tevt-warn' },
+        el('span', { class: 'tevt-ico', html: Icons.retry(13) }),
+        el('div', { class: 'tevt-body' }, el('div', { class: 'tevt-tx', text: ev.text })));
+    } else if (ev.type === 'node-blocked') {
+      node = el('div', { class: 'tevt tevt-warn' },
+        el('span', { class: 'tevt-ico', html: Icons.alert(13) }),
+        el('div', { class: 'tevt-body' }, el('div', { class: 'tevt-tx', text: ev.text })));
+    } else if (ev.type === 'node-error') {
+      node = el('div', { class: 'tevt tevt-err' },
+        el('span', { class: 'tevt-ico', html: Icons.alert(13) }),
+        el('div', { class: 'tevt-body' }, el('div', { class: 'tevt-tx', text: ev.text })));
+    } else if (ev.type === 'message') {
+      node = el('div', { class: 'tevt tevt-msg' },
+        el('span', { class: 'tevt-ico', html: Icons.mail ? Icons.mail(13) : '' }),
+        el('div', { class: 'tevt-body' }, el('div', { class: 'tevt-tx', text: ev.text })));
+    } else if (ev.type === 'ask') {
+      node = el('div', { class: 'tevt tevt-ask' },
+        el('span', { class: 'tevt-ico', html: Icons.alert(13) }),
+        el('div', { class: 'tevt-body' }, el('div', { class: 'tevt-tx', text: ev.text })));
+    } else if (ev.type === 'tool') {
+      node = el('div', { class: 'tevt tevt-tool' },
+        el('span', { class: 'tevt-ico', html: Icons.tool(13) }),
+        el('div', { class: 'tevt-body' },
+          el('div', { class: 'tevt-hd' }, el('span', { class: 'who', text: nodeName(ev.nodeId) }), el('span', { class: 'tevt-tag', text: ev.name }))));
+      if (ev.display && ['chart', 'images', 'mermaid', 'file', 'fileframe'].includes(ev.display.kind)) {
+        node.querySelector('.tevt-body').append(UI.displayNode(ev.display, { name: ev.name }));
+      }
+    } else if (ev.type === 'finish') {
+      node = el('div', { class: 'tevt tevt-finish' },
+        el('span', { class: 'tevt-ico', html: Icons.check(13) }),
+        el('div', { class: 'tevt-body' }, el('div', { class: 'tevt-hd', text: '任务结束' })));
+    } else {
+      return;   // delta 之类的不渲染
+    }
+
+    if (node) {
+      box.append(node);
+      scrollBottomOrg();
+      this.renderStats();
+      // 状态变化时刷新树上的点
+      this._treeTick = (this._treeTick || 0) + 1;
+      if (this._treeTick % 3 === 0) this.renderTree();
+    }
+  },
+
+  clearTrace() {
+    const box = $('#orgTrace');
+    if (!box) return;
+    box.innerHTML = '';
+    const lead = Org.rootLeader();
+    const members = Org.all();
+    const flow = el('div', { class: 'te-flow' },
+      el('span', { class: 'tef-node lead', text: lead ? lead.name : '大领导' }),
+      el('span', { class: 'tef-arrow', text: '→' }),
+      el('span', { class: 'tef-node', text: '小领导' }),
+      el('span', { class: 'tef-arrow', text: '→' }),
+      el('span', { class: 'tef-node', text: '执行者' }),
+      el('span', { class: 'tef-arrow', text: '→' }),
+      el('span', { class: 'tef-node insp', text: '检查者' }));
+    box.append(el('div', { class: 'trace-empty' },
+      el('div', { class: 'te-ico', html: Icons.flow ? Icons.flow(22) : '' }),
+      el('h3', { text: '把目标交给团队' }),
+      el('p', { class: 'sub', text: '写在下面的输入框里发给大领导。它会拆解任务、分派给小领导与执行者，每份产出都要过独立检查者 —— 不合格会被打回重做。' }),
+      flow,
+      el('div', { class: 'te-tips' },
+        el('div', {}, el('b', { text: String(members.length) }), el('span', { text: ' 名成员在编' })),
+        el('div', {}, el('b', { text: '1' }), el('span', { text: ' 名独立检查者（标准固定）' })),
+        el('div', {}, el('b', { text: '3' }), el('span', { text: ' 层可嵌套（领导/小领导/执行者）' }))),
+      el('p', { class: 'te-hint', text: '小提示：左侧组织架构里可以加人、改角色说明；工具结果卡片上点「交给团队」可把材料一并带上。' })));
+  },
+
+  /* ---------------- 运行 ---------------- */
+  async startRun() {
+    const ta = $('#orgGoal');
+    const goal = (ta && ta.value || '').trim();
+    if (!goal) return toast('先写清楚要让团队做什么', 'err');
+
+    const v = Org.validate();
+    if (!v.ok) return toast('组织配置不完整：' + v.errs.join('；'), 'err', 6000);
+    if (!curKeyReady()) return toast('还没配模型 Key：右上角 ⚙ → 模型', 'err', 6000);
+
+    const atts = State.orgAttachments || [];
+    if (ta) { ta.value = ''; autoGrow(ta); }
+    State.orgAttachments = []; this.renderOrgAttachments();
+
+    this.clearTrace();
+    this.setRunningUI(true);
+    toast('已交给大领导，团队开始工作', 'ok', 2200);
+    try {
+      const res = await OrgRuntime.run(goal, { attachments: atts });
+      this.appendFinal(res);
+    } catch (e) {
+      toast('运行失败：' + e.message, 'err', 7000);
+      this.appendEvent({ type: 'node-error', text: e.message });
+    } finally {
+      this.setRunningUI(false);
+      this.render();
+    }
+  },
+
+  appendFinal(res) {
+    const box = $('#orgTrace');
+    if (!box) return;
+    const rv = res && res.review;
+    const node = el('div', { class: 'finalcard' },
+      el('div', { class: 'fc-hd' },
+        el('b', { text: '最终交付' }),
+        rv ? el('span', { class: 'verdict ' + (rv.verdict === 'pass' ? 'ok' : 'no'), text: rv.verdict === 'pass' ? '检查通过' : '检查未通过' }) : null,
+        rv ? el('span', { class: 'score', text: rv.score + ' 分' }) : null,
+        el('span', { style: 'flex:1' }),
+        el('button', { class: 'btn sm ghost', html: Icons.copy(13) + '<span>复制</span>', onclick: () => copyText(res.text || '') })),
+      el('div', { class: 'fc-body md', html: MD.render(res.text || '') }),
+      rv && rv.mustFix && rv.mustFix.length
+        ? el('div', { class: 'fc-fix', text: '检查者要求继续改进：' + rv.mustFix.join('；') })
+        : null);
+    box.append(node);
+    scrollBottomOrg();
+    MD.highlight(node);
+  },
+
+  askUser({ nodeId, question }) {
+    return new Promise((resolve) => {
+      const who = Org.get(nodeId);
+      let done = false;
+      const m = openModal({
+        title: (who ? who.name : '成员') + ' 想确认一件事',
+        bodyHTML: '',
+        okText: '提交回答',
+        cancelText: '跳过',
+        onOk: (body) => {
+          done = true;
+          const v = (body.querySelector('textarea') || {}).value || '';
+          resolve(v.trim());
+        }
+      });
+      m.body.append(el('div', { class: 'hint', style: 'margin-bottom:8px', text: question }));
+      m.body.append(el('textarea', { rows: '4', placeholder: '回答会作为消息发回给它…', style: 'width:100%' }));
+      // 取消/关闭时视为跳过
+      const obs = new MutationObserver(() => {
+        if (!document.querySelector('#modal').classList.contains('open') && !done) { done = true; resolve(''); obs.disconnect(); }
+      });
+      obs.observe($('#modal'), { attributes: true, attributeFilter: ['class'] });
+    });
+  },
+
+  /* ---------------- 节点编辑 ---------------- */
+  addNodeDialog(role, parentId = null) {
+    const roleName = ORG_ROLES[role] ? ORG_ROLES[role].label : role;
+    const parent = parentId ? Org.get(parentId) : null;
+    let n = 1;
+    const base = role === 'worker' ? '执行者' : role === 'subleader' ? '小领导' : role === 'inspector' ? '检查者' : '领导';
+    while (Org.all().some((x) => x.name === `${base} ${n}`)) n++;
+    const defName = `${base} ${n}`;
+
+    const nameInput = el('input', { type: 'text', value: defName });
+    const promptArea = el('textarea', { rows: '3', placeholder: '给它的角色说明（可留空）' });
+    const body = el('div', {},
+      el('div', { class: 'field' }, el('label', { text: '名称' }), nameInput),
+      role === 'inspector'
+        ? el('div', { class: 'hint', text: '检查者的评审标准由代码固定，任何人都改不了，保证公正。' })
+        : el('div', { class: 'field' }, el('label', { text: '角色说明' }), promptArea));
+
+    openModal({
+      title: `添加${roleName}` + (parent ? `（隶属 ${parent.name}）` : ''),
+      bodyHTML: '', okText: '添加',
+      onOk: () => {
+        try {
+          Org.add({ role, parentId, name: nameInput.value.trim() || defName, prompt: promptArea.value.trim() });
+          this.render();
+          toast('已添加', 'ok');
+        } catch (e) { toast(e.message, 'err', 5000); return false; }
+      }
+    }).body.append(body);
+  },
+
+  editNodeDialog(id, nameOnly = false) {
+    const n = Org.get(id);
+    if (!n) return;
+    const nameInput = el('input', { type: 'text', value: n.name });
+    const promptArea = el('textarea', { rows: '5', placeholder: '角色说明' });
+    promptArea.value = n.prompt || '';
+
+    const wrap = el('div', {},
+      el('div', { class: 'field' }, el('label', { text: '名称' }), nameInput));
+    if (!nameOnly && n.role !== 'inspector') {
+      wrap.append(el('div', { class: 'field' }, el('label', { text: '角色说明' }), promptArea));
+      const subs = Org.childrenOf(id);
+      // 允许调整归属（换上级）
+      if (n.parentId) {
+        const opts = Org.chain().filter((x) => x.id !== id && ORG_ROLES[x.role].canDelegate && Org.depth(x.id) < Org.depth(id));
+        if (opts.length) {
+          const sel = el('select', {});
+          sel.append(el('option', { value: '', text: '（保持当前上级）' }));
+          for (const o of opts) sel.append(el('option', { value: o.id, text: o.name + '（' + ORG_ROLES[o.role].label + '）' }));
+          wrap.append(el('div', { class: 'field' }, el('label', { text: '改上级' }), sel));
+          wrap._parentSel = sel;
+        }
+      }
+    }
+    if (n.role === 'inspector') {
+      wrap.append(el('div', { class: 'hint', text: '评审标准固定为 6 条（回答准确性、事实依据、交付完整性、逻辑一致性、约束遵守、不虚报完成），不可修改。' }));
+    }
+
+    openModal({
+      title: '编辑 · ' + n.name, bodyHTML: '', okText: '保存',
+      onOk: () => {
+        const patch = { name: nameInput.value.trim() || n.name };
+        if (!nameOnly && n.role !== 'inspector') patch.prompt = promptArea.value;
+        if (wrap._parentSel && wrap._parentSel.value) patch.parentId = wrap._parentSel.value;
+        Org.update(id, patch);
+        this.render();
+        toast('已保存', 'ok');
+      }
+    }).body.append(wrap);
+  },
+
+  showCriteria() {
+    openModal({
+      title: '检查者的评审标准（代码固定）',
+      hideCancel: true, okText: '关闭',
+      bodyHTML: `<div class="hint" style="margin-bottom:10px">以下标准写在代码里，任何角色（包括大领导）都无法修改，也不能删除最后一名检查者。</div>
+        <ol style="padding-left:18px;line-height:1.9;color:var(--text-1)">
+          ${Inspector.CRITERIA.map((c) => `<li>${esc(String(c).replace(/^\d+\.\s*/, ''))}</li>`).join('')}
+        </ol>
+        <div class="hint" style="margin-top:10px">输出格式：<code>{"verdict":"pass|reject","score":0-100,"reasons":[],"mustFix":[]}</code><br>
+        分数低于 70 分即使模型判 pass 也会被降级为 reject（防止放水）。</div>`
+    });
+  },
+
+  /* ---------------- 消息总线 ---------------- */
+  openBus() {
+    const list = OrgBus.list().slice().reverse();
+    const nameOf = (id) => (id === 'user' ? '你' : (Org.get(id) ? Org.get(id).name : id));
+    const rows = list.length
+      ? list.map((m) => {
+        const cls = { dispatch: 'd', report: 'r', review: 'v', message: 'm' }[m.kind] || 'm';
+        return `<div class="busrow ${cls}">
+          <div class="bus-hd"><b>${esc(nameOf(m.from))}</b><span class="arrow">→</span><b>${esc(m.to === 'all' ? '全员' : nameOf(m.to))}</b>
+          <span class="bus-kind">${esc(m.kind)}</span><span class="bus-t">${fmtTime(m.ts).slice(11, 16)}</span></div>
+          ${m.subject ? `<div class="bus-sub">${esc(m.subject)}</div>` : ''}
+          <div class="bus-body">${esc(truncate(m.body, 300))}</div>
+          ${m.attachments.length ? `<div class="bus-att">附件：${m.attachments.map((a) => esc(a.name) + '（' + a.chars + ' 字）').join('、')}</div>` : ''}
+        </div>`;
+      }).join('')
+      : '<div class="hint">还没有任何消息。运行一次任务后，这里会显示全部往来。</div>';
+    openModal({
+      title: `消息总线（${list.length} 条）`, hideCancel: true, okText: '关闭',
+      bodyHTML: `<div class="hint" style="margin-bottom:10px">所有 Agent 之间的往来都在这里，包含分派、交付、审核结论与附带的工具结果。</div><div class="buslist">${rows}</div>`
+    });
+  },
+
+  /* ---------------- 附件（可把工具结果/上传内容随下一轮发送） ---------------- */
+  async attachFiles(files) {
+    if (!state0(files)) return;
+    if (!State.orgAttachments) State.orgAttachments = [];
+    for (const f of files) {
+      try {
+        let text = '';
+        const ext = DocParser.ext(f.name);
+        if (DocParser.isOffice(f.name) || ext === 'pdf') {
+          const r = await DocParser.read(f, f.name);
+          text = r.text || '';
+        } else if (/^image\//.test(f.type)) {
+          text = '[图片文件：' + f.name + '，' + fmtBytes(f.size) + ']';
+        } else {
+          text = await f.text();
+        }
+        State.orgAttachments.push({ name: f.name, kind: 'file', text: text.slice(0, 20000), chars: text.length });
+      } catch (e) { toast(f.name + ' 读取失败：' + e.message, 'err', 5000); }
+    }
+    this.renderOrgAttachments();
+    toast(`已附加 ${State.orgAttachments.length} 个材料，会随任务一起发给大领导`, 'ok', 2600);
+  },
+
+  /** 把任意文本作为材料附加（如工具返回结果） */
+  attachText(name, text, kind = 'tool') {
+    if (!State.orgAttachments) State.orgAttachments = [];
+    State.orgAttachments.push({ name, kind, text: String(text || '').slice(0, 20000), chars: String(text || '').length });
+    this.renderOrgAttachments();
+  },
+
+  renderOrgAttachments() {
+    const box = $('#orgAttach');
+    if (!box) return;
+    const arr = State.orgAttachments || [];
+    box.innerHTML = '';
+    box.style.display = arr.length ? 'flex' : 'none';
+    arr.forEach((a, i) => {
+      box.append(el('span', { class: 'a' },
+        el('span', { class: 'artico', html: Icons.file(12) }),
+        el('span', { class: 'aname', text: a.name }),
+        el('span', { class: 'achars', text: a.chars + ' 字' }),
+        el('span', { class: 'rm', html: Icons.close(10), onclick: () => { arr.splice(i, 1); this.renderOrgAttachments(); } })));
+    });
+  }
+};
+
+function state0(x) { return x && x.length; }
+function scrollBottomOrg() {
+  const s = $('#orgTrace');
+  if (!s) return;
+  const near = s.scrollHeight - s.scrollTop - s.clientHeight < 200;
+  if (near) s.scrollTop = s.scrollHeight;
 }
 
 /* expose for debugging / automation */

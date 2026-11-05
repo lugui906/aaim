@@ -252,6 +252,14 @@ const MockLLM = {
       return acc;
     };
     const toolNames = new Set((tools || []).map((t) => t.function.name));
+    // —— 企业团队模式：演示模型也走真实的 hire/assign/inspect 链路 ——
+    if (toolNames.has('org_hire') || toolNames.has('org_assign') || toolNames.has('org_inspect')) {
+      const r = MockOrgTurn(messages, toolNames, lastMsg, lastUser);
+      if (r) {
+        if (r.text) await emit(r.text, 4);
+        return { text: r.text || '', thinking: r.thinking || '', toolCalls: r.toolCalls || [], usage: { in: estMessagesTokens(messages), out: estTokens(r.text || '') }, raw: { style: 'mock' } };
+      }
+    }
     // 工具返回后 → 总结
     if (lastMsg && lastMsg.role === 'tool') {
       // ★ 只列「本轮」新产生的工具结果：之前写成 slice(-3) 会把前几轮的也列出来，
@@ -333,3 +341,89 @@ const MockLLM = {
     return { text: head, thinking: '需要外部能力，调用注册表中的工具来获取真实结果。', toolCalls: call ? [call] : [], usage: { in: estMessagesTokens(messages), out: estTokens(head) }, raw: { style: 'mock' } };
   }
 };
+
+/* ---------------- 演示模型的企业团队行为 ----------------
+   为了在没配 Key 时也能验证完整链路，这里给出最小可用的"领导行为"：
+   首轮招人 → 派活 → 请检查者 → 汇总。真实模型则走自己的判断。
+-------------------------------------------------------------------------- */
+function MockOrgTurn(messages, toolNames, lastMsg, lastUser) {
+  const me = typeof OrgRunner !== 'undefined' ? OrgRunner.currentAgent : null;
+  if (!me) return null;
+
+  // 已收到工具结果 → 继续下一步
+  if (lastMsg && lastMsg.role === 'tool') {
+    let r = null;
+    try { r = JSON.parse(lastMsg.content); } catch { }
+    const txt = String(lastMsg.content || '');
+
+    // 刚派完活，拿到下级交付 → 请检查者审查
+    if (lastMsg.name === 'org_assign' && toolNames.has('org_inspect') && typeof Org !== 'undefined' && Org.inspectors().length) {
+      const m = /「(.+?)」的交付：\n([\s\S]*)/.exec(txt);
+      const deliver = m ? m[2] : txt;
+      return {
+        text: '收到下级的交付，先请检查者按标准验一遍。\n\n',
+        toolCalls: [{
+          id: uid('call'), name: 'org_inspect', arguments: {
+            requirement: String((lastUser && lastUser.content) || '').slice(0, 800),
+            deliverable: deliver.slice(0, 3000),
+            criteria: ['内容回应了原始需求的每一项', '有明确结论，不是空话或占位', '关键事实/数据有出处或说明依据']
+          }
+        }]
+      };
+    }
+
+    // 刚拿到审查判定 → 汇总收尾
+    if (lastMsg.name === 'org_inspect') {
+      const verdict = /✓ 审查通过/.test(txt) ? 'PASS' : 'FAIL';
+      const final = verdict === 'PASS'
+        ? '已完成，交付物通过独立检查者验收。\n\n' + truncate(txt.replace(/^[^\n]*\n/, ''), 1200)
+        : '检查者判定未通过，需要返工。\n\n' + truncate(txt, 1000);
+      return { text: final, toolCalls: [] };
+    }
+
+    // 刚招完人 → 给他派活
+    if (lastMsg.name === 'org_hire') {
+      const idM = /id=(\w+)/.exec(txt);
+      if (idM && toolNames.has('org_assign')) {
+        return {
+          text: '人已经到位，把活派下去。\n\n',
+          toolCalls: [{
+            id: uid('call'), name: 'org_assign', arguments: {
+              targetId: idM[1],
+              task: String((lastUser && lastUser.content) || '').slice(0, 900) + '\n\n请产出可直接交付的中文结果，不要占位词。'
+            }
+          }]
+        };
+      }
+    }
+    return null;
+  }
+
+  // 首轮：领导先看看团队
+  if (toolNames.has('org_status') && !me.childIds.length) {
+    return { text: '先看看团队里都有谁。\n\n', toolCalls: [{ id: uid('call'), name: 'org_status', arguments: {} }] };
+  }
+
+  // 首轮（团队已有人手）：直接派给执行者
+  if (toolNames.has('org_assign') && typeof Org !== 'undefined') {
+    const subs = Org.descendants(me.id).filter((a) => a.role === 'worker');
+    if (subs.length) {
+      return {
+        text: '任务交给执行者处理。\n\n',
+        thinking: '这个需求适合直接派给执行者，做完再请检查者验收。',
+        toolCalls: [{
+          id: uid('call'), name: 'org_assign', arguments: {
+            targetId: subs[0].id,
+            task: String((lastUser && lastUser.content) || '').slice(0, 900) + '\n\n请产出可直接交付的中文结果。'
+          }
+        }]
+      };
+    }
+  }
+
+  // 执行者：没有 org 权限就用普通话术
+  return {
+    text: `我是「${me.name}」，负责：${me.brief || '执行分配到的任务'}。\n\n当前演示模型只做流程演示，接到任务会说明收到。换成真实模型（⚙ → 模型）后，这里会是真实产出。`,
+    toolCalls: []
+  };
+}

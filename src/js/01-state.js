@@ -96,6 +96,8 @@ const State = {
   plugins: Store.get('plugins', []) || [],
   kb: Store.get('kb', { docs: [], chunks: [] }) || { docs: [], chunks: [] },
   audit: [],            // 本次运行的工具审计（L4）
+  org: Store.get('org', null),        // 企业模式的组织架构（惰性初始化）
+  orgBus: Store.get('orgBus', []) || [],  // Agent 之间的通信记录
   running: false,
   abort: null,
   queue: [],            // E1

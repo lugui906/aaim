@@ -34,6 +34,13 @@ const Icons = {
   brain(s = 14) { return this._wrap('<path d="M9.5 4.5a2.7 2.7 0 0 0-2.7 2.7 2.4 2.4 0 0 0-1.4 4.3A2.6 2.6 0 0 0 6.9 16a2.6 2.6 0 0 0 2.6 2.2V4.5z"/><path d="M14.5 4.5a2.7 2.7 0 0 1 2.7 2.7 2.4 2.4 0 0 1 1.4 4.3A2.6 2.6 0 0 1 17.1 16a2.6 2.6 0 0 1-2.6 2.2V4.5z"/>', s, 1.4); },
   tool(s = 13) { return this._wrap('<path d="M14.5 5.5a3.5 3.5 0 0 1 4.7 4.7l-8.5 8.5-2.9.6.6-2.9z"/><path d="M5 6l2.2 2.2"/>', s, 1.5); },
   memory(s = 14) { return this._wrap('<path d="M12 3.5c-3 0-4.5 1.8-4.5 4 0 1.3.4 2.2-.6 3.4-1 1.2-1.4 2.3-1.4 3.4 0 2.4 2.2 4.2 4.5 4.2h4c2.3 0 4.5-1.8 4.5-4.2 0-1.1-.4-2.2-1.4-3.4-1-1.2-.6-2.1-.6-3.4 0-2.2-1.5-4-4.5-4z"/><path d="M9.5 20v-4.5M14.5 20v-4.5"/>', s, 1.4); },
+  // 企业模式
+  crown(s = 14) { return this._wrap('<path d="M4 8l3.2 3L12 5l4.8 6L20 8l-1.4 8.5H5.4z"/><path d="M5.4 19h13.2"/>', s, 1.5); },
+  lead(s = 14) { return this._wrap('<circle cx="12" cy="7.5" r="2.8"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/>', s, 1.6); },
+  worker(s = 14) { return this._wrap('<rect x="4" y="6.5" width="16" height="12" rx="2"/><path d="M9 6.5V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1.5"/><path d="M4 12h16"/>', s, 1.5); },
+  shield(s = 14) { return this._wrap('<path d="M12 3.5l7 2.5v5.5c0 4-3 7.2-7 8.5-4-1.3-7-4.5-7-8.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>', s, 1.5); },
+  mail(s = 14) { return this._wrap('<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>', s, 1.5); },
+  flow(s = 14) { return this._wrap('<rect x="9" y="3" width="6" height="4.5" rx="1.2"/><rect x="3" y="16.5" width="6" height="4.5" rx="1.2"/><rect x="15" y="16.5" width="6" height="4.5" rx="1.2"/><path d="M12 7.5v4M6 16.5v-2.2a1.3 1.3 0 0 1 1.3-1.3h9.4a1.3 1.3 0 0 1 1.3 1.3v2.2"/>', s, 1.5); },
   check(s = 13) { return this._wrap('<path d="M5 12.5l4.5 4.5L19 7"/>', s, 2); },
   alert(s = 13) { return this._wrap('<circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 16.2v.1"/>', s, 1.6); }
 };

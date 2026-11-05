@@ -43,11 +43,18 @@ const estMessagesTokens = (msgs) => msgs.reduce((a, m) => a + 4 + estTokens(type
 const TOAST_MAX = 3;
 /** 让提示条始终浮在输入框上方，不遮挡输入区 */
 function syncToastOffset() {
-  const box = document.querySelector('#composer');
   const wrap = $('#toasts');
-  if (!box || !wrap) return;
-  const h = box.getBoundingClientRect().height;
-  wrap.style.bottom = Math.round(h + 10) + 'px';
+  if (!wrap) return;
+  // 企业模式下 #composer 是隐藏的（高度 0），必须按实际可见的那个输入区算，
+  // 否则提示条会落到底部并压住输入框。
+  let h = 0;
+  for (const sel of ['#orgComposer', '#composer']) {
+    const box = document.querySelector(sel);
+    if (!box) continue;
+    const r = box.getBoundingClientRect();
+    if (r.height > 0 && getComputedStyle(box).display !== 'none') { h = r.height; break; }
+  }
+  wrap.style.bottom = Math.round(h + 12) + 'px';
 }
 window.addEventListener('resize', debounce(syncToastOffset, 120));
 

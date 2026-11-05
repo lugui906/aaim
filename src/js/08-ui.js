@@ -79,6 +79,29 @@ const UI = {
     toast('沙箱内脚本报错：' + truncate(String(msg), 80), 'err', 4000);
   },
 
+  /** 顶栏模式 chip：单 Agent / 企业团队 */
+  updateModeChip() {
+    const chip = $('#modeChip');
+    if (!chip) return;
+    const on = !!(State.org && State.org.enabled);
+    const txt = $('#modeChipText');
+    const n = (State.org && State.org.nodes) ? State.org.nodes.filter((x) => x.role !== 'inspector').length : 0;
+    if (txt) txt.textContent = on ? '企业团队' + (n ? ` · ${n} 人` : '') : '单 Agent';
+    chip.classList.toggle('on', on);
+    chip.title = on ? '当前：企业式多 Agent 团队（点击切回单 Agent）' : '当前：单 Agent（点击切换到企业团队模式）';
+    const oc = $('#orgCount');
+    if (oc) oc.textContent = n ? String(n) : '';
+  },
+
+  /** 组织变动时刷新徽标与面板 */
+  orgChanged() {
+    this.updateModeChip();
+    const n = (State.org && State.org.nodes) ? State.org.nodes.length : 0;
+    const a = $('#orgCount');
+    if (a) { a.textContent = n ? String(n) : ''; a.style.display = n ? '' : 'none'; }
+    if (typeof OrgUI !== 'undefined') { try { OrgUI.render(); } catch { } }
+  },
+
   updateMemoryBadge() {
     const n = (typeof Memory !== 'undefined') ? Memory.count() : 0;
     const a = $('#memCount');
@@ -125,8 +148,21 @@ const UI = {
       ['画张图', '画一张 1–5 月销售额与成本的折线图']
     ];
     const fill = (p) => { const ta = $('#prompt'); ta.value = p; autoGrow(ta); ta.focus(); ta.setSelectionRange(p.length, p.length); };
+    const on = !!(State.org && State.org.enabled);
     return el('div', { class: 'empty' },
-      el('h2', { text: '今天想做什么？' }),
+      el('h2', { text: on ? '把目标交给团队' : '今天想做什么？' }),
+      on
+        ? null
+        : el('button', {
+            class: 'org-cta',
+            onclick: () => { $('#modeChip').click(); },
+            title: '领导拆解任务、分派给小领导与执行者，每份产出都要过独立检查者'
+          },
+          el('span', { class: 'org-cta-ico', html: Icons.flow ? Icons.flow(18) : '' }),
+          el('span', { class: 'org-cta-tx' },
+            el('b', { text: '开启企业模式' }),
+            el('span', { text: '多个 Agent 分工协作：大领导拆解 → 小领导分派 → 执行者交付 → 检查者审核' })),
+          el('span', { class: 'org-cta-go', text: '→' })),
       el('div', { class: 'pills' }, briefs.map(([t, p]) => el('button', { onclick: () => fill(p), title: p }, t))));
   },
 
@@ -192,12 +228,20 @@ const UI = {
     // 工具调用：一行摘要，默认收起
     if (n > 0) {
       const inner = el('div', { class: 'inner' });
-      calls.forEach((c, idx) => {
-        const t = tools[idx] || {};
-        inner.append(this.stepNode({ name: c.name, args: c.arguments, state: t.ok === false ? 'err' : 'ok', ms: t.ms }));
+      // 按位置配对「调用」与「结果」；结果多于调用时（历史数据）也要渲染出来
+      const maxN = Math.max(calls.length, tools.length);
+      for (let i2 = 0; i2 < maxN; i2++) {
+        const c = calls[i2] || null;
+        const t = tools[i2] || {};
+        const name = (c && c.name) || t.name || '工具';
+        if (calls.length) {
+          inner.append(this.stepNode({ name, args: (c && c.arguments) || {}, state: t.ok === false ? 'err' : 'ok', ms: t.ms }));
+        }
         const d = t.display;
-        if (d && !this.isDirectDisplay(d)) inner.append(this.displayNode(d, t));
-      });
+        if (d && !this.isDirectDisplay(d)) {
+          inner.append(this.withOrgAction(this.displayNode(d, t), name, t.content, d));
+        }
+      }
       body.append(el('details', { class: 'steps' },
         el('summary', {}, el('span', { class: 'stxt', text: this.stepsLabel(n, totalMs, failed) })), inner));
     }
@@ -214,7 +258,7 @@ const UI = {
             // 临时压制自动运行
           }
         }
-        viz.append(this.displayNode(m.display, m));
+        viz.append(this.withOrgAction(this.displayNode(m.display, m), m.name || '工具', m.content, m.display));
       }
       body.append(viz);
     }
@@ -248,7 +292,7 @@ const UI = {
   },
   /** 可视输出：图表 / 流程图 / 图片 / 沙箱演示，应当直接可见（用户要看的成果，不是日志） */
   isVisualDisplay(d) {
-    return d && ['chart', 'mermaid', 'images', 'frame'].includes(d.kind);
+    return d && ['chart', 'mermaid', 'images', 'frame', 'orgtree', 'orgdeliver', 'orgreview', 'orgmsg'].includes(d.kind);
   },
   /** 既不进折叠区、也不用放进产物条的输出 */
   isDirectDisplay(d) {
@@ -448,16 +492,6 @@ const UI = {
       for (const a of d.items) card.append(this.artifactNode(a));
       return card;
     }
-    if (kind === 'delegate') {
-      return el('div', { class: 'toolcard' },
-        el('div', { class: 'hd' }, el('b', { text: '子 Agent 结论' }), el('span', { class: 'badge', text: (d.trace || []).length + ' 步' })),
-        el('div', { class: 'md', html: MD.render(d.answer || '') }),
-        el('details', { style: 'margin-top:6px' }, el('summary', { style: 'font-size:12px;color:var(--dim)', text: '子 Agent 轨迹' }),
-          el('pre', { style: 'font-size:11px;overflow:auto;max-height:200px', text: JSON.stringify(d.trace, null, 2) })));
-    }
-    if (kind === 'denied') {
-      return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: '⚠ 已跳过工具 ' + d.name + '（用户拒绝）' }));
-    }
     if (kind === 'memory') {
       const card = el('div', { class: 'toolcard' }, el('div', { class: 'hd' },
         el('b', { text: d.action === 'search' ? '长期记忆检索' : d.action === 'clear' ? '已清空记忆' : d.action === 'remove' ? '已删除记忆' : '已记住' }),
@@ -466,7 +500,10 @@ const UI = {
       for (const it of items) card.append(el('div', { class: 'memrow' },
         el('span', { class: 'memdot' }),
         el('span', { class: 'memtxt', text: it.text }),
-        d.action === 'search' ? null : el('button', { class: 'btn sm ghost', text: '删除', onclick: () => { Memory.remove(it.id); card.remove(); UI.updateMemoryBadge(); toast('已删除'); } })));
+        d.action === 'search' ? null : el('button', {
+          class: 'btn sm ghost', text: '删除',
+          onclick: () => { Memory.remove(it.id); card.remove(); UI.updateMemoryBadge(); toast('已删除'); }
+        })));
       if (!items.length) card.append(el('div', { class: 'hint', text: '没有匹配的记忆' }));
       return card;
     }
@@ -495,7 +532,7 @@ const UI = {
           el('span', { style: 'flex:1' }),
           el('span', { class: 'badge', text: d.mode === 'replace' ? '整文件覆盖' : '精确替换' })));
       const dv = el('div', { class: 'diff' });
-      d.diff.rows.forEach((r) => dv.append(el('div', { class: 'dl ' + (r.t === '+' ? 'add' : r.t === '-' ? 'del' : '') },
+      (d.diff.rows || []).forEach((r) => dv.append(el('div', { class: 'dl ' + (r.t === '+' ? 'add' : r.t === '-' ? 'del' : '') },
         el('span', { class: 'ln', text: r.n }), el('span', { class: 'sg', text: r.t === ' ' ? '' : r.t }), el('span', { class: 'tx', text: r.s }))));
       card.append(dv);
       const btn = el('button', { class: 'btn primary', text: '写入文件', onclick: async (e) => {
@@ -523,8 +560,71 @@ const UI = {
         } })));
       return card;
     }
-    if (kind === 'file') return el('div', { class: 'toolcard' }, this.artifactNode(d.art));
+    if (kind === 'delegate') {
+      return el('div', { class: 'toolcard' },
+        el('div', { class: 'hd' }, el('b', { text: '子 Agent 结论' }), el('span', { class: 'badge', text: (d.trace || []).length + ' 步' })),
+        el('div', { class: 'md', html: MD.render(d.answer || '') }),
+        el('details', { style: 'margin-top:6px' }, el('summary', { style: 'font-size:12px;color:var(--dim)', text: '子 Agent 轨迹' }),
+          el('pre', { style: 'font-size:11px;overflow:auto;max-height:200px', text: JSON.stringify(d.trace, null, 2) })));
+    }
+    if (kind === 'denied') {
+      return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: '⚠ 已跳过工具 ' + d.name + '（用户拒绝）' }));
+    }
+    if (kind === 'orgtree') {
+      const nodes = (State.org && State.org.nodes) ? State.org.nodes : [];
+      const card = el('div', { class: 'toolcard' },
+        el('div', { class: 'hd' }, el('b', { text: '组织结构' }),
+          el('span', { class: 'badge', text: nodes.length + ' 人' }), el('span', { style: 'flex:1' }),
+          el('button', { class: 'btn sm ghost', text: '打开面板', onclick: () => OrgUI.applyMode(true) })));
+      for (const a of nodes) {
+        const d = Org.depth(a.id);
+        card.append(el('div', { class: 'memrow' },
+          el('span', { class: 'orgindent', style: `width:${d * 14}px` }),
+          el('span', { class: 'memdot', style: a.role === 'inspector' ? 'background:var(--warn)' : '' }),
+          el('span', { class: 'memtxt', text: `${a.name}（${ORG_ROLES[a.role] ? ORG_ROLES[a.role].label : a.role}）` }),
+          el('span', { class: 'badge', text: ({ idle: '待命', running: '执行中', done: '完成', blocked: '未通过', error: '出错' })[a.status] || a.status })));
+      }
+      return card;
+    }
     return el('div', { class: 'toolcard' }, el('div', { class: 'hd', text: (m && m.name) || '工具结果' }));
+  },
+
+  /** 把工具结果作为材料交给团队（企业模式） */
+  sendToolToOrg(name, text, display) {
+    if (typeof OrgUI === 'undefined') return;
+    // 优先用结构化展示内容（比模型看到的截断文本更完整、更好读）
+    let body = '';
+    if (display) {
+      if (display.kind === 'search' && display.results) {
+        body = `搜索「${display.query || ''}」（${display.provider || ''}）结果：\n\n` +
+          display.results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet || ''}`).join('\n\n');
+      } else if (display.kind === 'fetch') {
+        body = `抓取 ${display.url || ''}\n\n${display.text || ''}`;
+      } else if (display.kind === 'code') {
+        body = `代码：\n${display.code || ''}\n\n结果：\n${display.result || display.error || ''}`;
+      } else if (display.kind === 'kb' && display.hits) {
+        body = display.hits.map((h, i) => `[${i + 1}] ${h.docName} #${h.idx}\n${h.text}`).join('\n\n');
+      }
+    }
+    if (!body) body = String(text || '');
+    if (!body && display) body = JSON.stringify(display).slice(0, 8000);
+    OrgUI.attachText(`${name} 返回结果`, body, 'tool');
+    if (!(State.org && State.org.enabled)) $('#modeChip').click();
+    setTimeout(() => { const g = $('#orgGoal'); if (g) g.focus(); }, 200);
+    toast('已作为材料附加，写清目标后点发送即可交给团队', 'ok', 3200);
+  },
+
+  /** 给任意工具卡片挂上「交给团队」入口 */
+  withOrgAction(card, name, text, display) {
+    if (!card || !card.classList || !card.classList.contains('toolcard')) return card;
+    const hd = card.querySelector('.hd');
+    if (!hd || hd.querySelector('.org-send')) return card;
+    hd.append(el('span', { style: 'flex:1' }), el('button', {
+      class: 'org-send', title: '把这份结果作为材料交给团队',
+      html: (Icons.flow ? Icons.flow(12) : '') + '<span>交给团队</span>',
+      onclick: (e) => { e.stopPropagation(); this.sendToolToOrg(name, text, display); }
+    }));
+    return card;
   },
 
   /** 产物按钮统一入口：点击时给视觉反馈，避免「点了没反应」 */
